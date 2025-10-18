@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes import auth
 from routes import user
 
-# Inicialización de la aplicación FastAPI
 
 app = FastAPI(
     title="Sistema de Facturación de Agua",
