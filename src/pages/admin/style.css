@@ -27,7 +27,7 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* ===== SIDEBAR STYLES ===== */
+/* ===== SIDEBAR STYLES "Barra lateral "===== */
 .sidebar {
   width: 280px;
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 50%, var(--accent-color) 100%);
