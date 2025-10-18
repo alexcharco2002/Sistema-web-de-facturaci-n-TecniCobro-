@@ -1,4 +1,4 @@
-// frontend/src/components/Login.js
+// frontend/src/components/Login.js esta pagina se mostra cuando el usuario no ha iniciado sesion
 // Componente de Login
 // Este componente maneja el inicio de sesión del usuario, validaciones y redirección según el perfil.
 import React, { useState, useEffect } from 'react'; 
