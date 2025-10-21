@@ -1,5 +1,5 @@
-// frontend/src/components/Login.js esta pagina se mostra cuando el usuario no ha iniciado sesion
-// Componente de Login
+// fronted pagina de INICIO DE SESION
+// src/components/Login.js 
 // Este componente maneja el inicio de sesión del usuario, validaciones y redirección según el perfil.
 import React, { useState, useEffect } from 'react'; 
 import { User, Lock, Eye, EyeOff, Droplets, AlertCircle } from 'lucide-react';

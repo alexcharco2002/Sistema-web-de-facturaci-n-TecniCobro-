@@ -6,6 +6,7 @@
 // Configuración del API
 const API_CONFIG = {
   baseURL: 'http://localhost:8000', // Puerto por defecto de FastAPI
+  
   timeout: 10000, // 10 segundos
   endpoints: {
     login: '/login',

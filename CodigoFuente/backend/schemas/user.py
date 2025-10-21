@@ -14,7 +14,7 @@ class UserOut(BaseModel):
     nombres: str
     apellidos: str
     rol: str
-    correo: str
+    email: str
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
@@ -35,7 +35,7 @@ class UserCreate(BaseModel):
     nombres: str
     apellidos: str
     cedula: str
-    correo: EmailStr
+    email: EmailStr
     telefono: Optional[str] = None
     direccion: Optional[str] = None
     rol: str = "cliente"
@@ -109,7 +109,7 @@ class UserCreate(BaseModel):
                 "nombres": "Juan",
                 "apellidos": "Pérez",
                 "cedula": "1234567890",
-                "correo": "jperez@example.com",
+                "email": "jperez@example.com",
                 "telefono": "0987654321",
                 "direccion": "Av. Principal 123",
                 "rol": "cliente",
@@ -126,7 +126,7 @@ class UserUpdate(BaseModel):
     nombres: Optional[str] = None
     apellidos: Optional[str] = None
     cedula: Optional[str] = None
-    correo: Optional[EmailStr] = None
+    email: Optional[EmailStr] = None
     telefono: Optional[str] = None
     direccion: Optional[str] = None
     rol: Optional[str] = None
@@ -201,7 +201,7 @@ class UserUpdate(BaseModel):
             "example": {
                 "nombres": "Juan Carlos",
                 "apellidos": "Pérez González",
-                "correo": "jperez_nuevo@example.com",
+                "email": "jperez_nuevo@example.com",
                 "telefono": "0987654322",
                 "direccion": "Av. Nueva 456",
                 "activo": True
@@ -217,7 +217,7 @@ class UserResponse(BaseModel):
     nombres: str
     apellidos: str
     cedula: str
-    correo: str
+    email: str
     telefono: Optional[str] = None
     direccion: Optional[str] = None
     rol: str
@@ -235,7 +235,7 @@ class UserResponse(BaseModel):
                 "nombres": "Juan",
                 "apellidos": "Pérez",
                 "cedula": "1234567890",
-                "correo": "jperez@example.com",
+                "email": "jperez@example.com",
                 "telefono": "0987654321",
                 "direccion": "Av. Principal 123",
                 "rol": "cliente",
@@ -251,7 +251,10 @@ class UserListResponse(BaseModel):
     usuario: str
     nombres: str
     apellidos: str
-    correo: str
+    email: str
+    cedula: str
+    telefono: Optional[str] = None # Telefono es opcional
+    direccion: Optional[str] = None # Direccion es opcional 
     rol: str
     activo: bool
     fecha_registro: Optional[str] = None

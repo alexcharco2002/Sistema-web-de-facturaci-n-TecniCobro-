@@ -320,17 +320,17 @@ const ProfilePage = () => {
             <div className="info-item">
               <label>
                 <Mail className="w-4 h-4" />
-                Correo Electrónico
+                email Electrónico
               </label>
               {isEditing ? (
                 <input
                   type="email"
-                  value={editedData.correo || ''}
-                  onChange={(e) => handleInputChange('correo', e.target.value)}
+                  value={editedData.email || ''}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
                   className="edit-input"
                 />
               ) : (
-                <p>{user.correo || 'No especificado'}</p>
+                <p>{user.email || 'No especificado'}</p>
               )}
             </div>
           </div>

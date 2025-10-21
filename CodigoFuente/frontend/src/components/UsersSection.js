@@ -1,6 +1,6 @@
 // src/components/users/UsersSection.js
 // MODULO DE USUARIOS -- Componente para la gestión de usuarios: listado, creación, edición, eliminación
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect , useCallback} from 'react';
 // para impoartar stilo css
 import './styleModeUser.css';
 import usersService from '../services/userServices';
@@ -41,7 +41,7 @@ const UsersSection = () => {
     nombres: '',
     apellidos: '',
     cedula: '',
-    correo: '',
+    email: '',
     telefono: '',
     direccion: '',
     rol: 'cliente',
@@ -54,86 +54,54 @@ const UsersSection = () => {
   });
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // Cargar usuarios
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setLoading(true);
-      // Simular llamada API
-      setTimeout(() => {
-        setUsers([
-          {
-            id: 1,
-            nombres: 'Juan Carlos',
-            apellidos: 'Pérez González',
-            correo: 'juan.perez@email.com',
-            telefono: '0987654321',
-            direccion: 'Av. Principal 123',
-            rol: 'admin',
-            activo: true,
-            fecha_registro: '2023-01-15',
-            ultimo_acceso: '2024-01-10'
-          },
-          {
-            id: 2,
-            nombres: 'María Elena',
-            apellidos: 'González López',
-            correo: 'maria.gonzalez@email.com',
-            telefono: '0987654322',
-            direccion: 'Calle Secundaria 456',
-            rol: 'cliente',
-            activo: true,
-            fecha_registro: '2023-02-20',
-            ultimo_acceso: '2024-01-09'
-          },
-          {
-            id: 3,
-            nombres: 'Carlos Alberto',
-            apellidos: 'Martínez Silva',
-            correo: 'carlos.martinez@email.com',
-            telefono: '0987654323',
-            direccion: 'Jr. Los Pinos 789',
-            rol: 'cliente',
-            activo: false,
-            fecha_registro: '2023-03-10',
-            ultimo_acceso: '2023-12-15'
-          }
-        ]);
-        setLoading(false);
-      }, 1000);
-    };
-
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  // Función para cargar usuarios del servidor
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
       const result = await usersService.getUsers({
         search: searchTerm,
-        rol: filterRole
+        rol: filterRole === 'all' ? undefined : filterRole
       });
 
       if (result.success) {
         setUsers(result.data);
+        console.log('✅ Usuarios cargados:', result.data.length);
       } else {
         setError(result.message);
+        console.error('Error al cargar usuarios:', result.message);
       }
     } catch (err) {
-      setError('Error al cargar usuarios');
-      console.error(err);
+      setError('Error al cargar usuarios desde el servidor');
+      console.error('Error en fetchUsers:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, filterRole]);
+
+  // ✅ CARGAR USUARIOS AL MONTAR EL COMPONENTE
+  useEffect(() => {
+    console.log('🔄 Componente montado, cargando usuarios...');
+    fetchUsers();
+  }, [fetchUsers]); // Se ejecuta solo una vez al montar
+
+  // Recargar cuando cambien los filtros
+  useEffect(() => {
+  const delaySearch = setTimeout(() => {
+    fetchUsers();
+  }, 500);
+
+  return () => clearTimeout(delaySearch);
+}, [searchTerm, filterRole, fetchUsers]);
+
 
   // Filtrar usuarios localmente (también se puede filtrar en el servidor)
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       user.nombres.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.correo.toLowerCase().includes(searchTerm.toLowerCase());
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesRole = filterRole === 'all' || user.rol === filterRole;
     
@@ -153,7 +121,7 @@ const UsersSection = () => {
         nombres: '',
         apellidos: '',
         cedula: '',
-        correo: '',
+        email: '',
         telefono: '',
         direccion: '',
         rol: 'cliente',
@@ -166,7 +134,7 @@ const UsersSection = () => {
         nombres: user.nombres,
         apellidos: user.apellidos,
         cedula: user.cedula,
-        correo: user.correo,
+        email: user.email,
         telefono: user.telefono || '',
         direccion: user.direccion || '',
         rol: user.rol,
@@ -508,7 +476,7 @@ const UsersSection = () => {
               <div className="user-contact">
                 <div className="contact-item">
                   <Mail className="w-4 h-4 text-gray-400" />
-                  <span>{user.correo}</span>
+                  <span>{user.email}</span>
                 </div>
                 {user.telefono && (
                   <div className="contact-item">
@@ -603,8 +571,8 @@ const UsersSection = () => {
                     <p>{selectedUser.cedula}</p>
                   </div>
                   <div className="detail-group">
-                    <label>Correo Electrónico:</label>
-                    <p>{selectedUser.correo}</p>
+                    <label>Email:</label>
+                    <p>{selectedUser.email}</p>
                   </div>
                   {selectedUser.telefono && (
                     <div className="detail-group">
@@ -695,13 +663,13 @@ const UsersSection = () => {
                     </div>
                     
                     <div className="form-group">
-                      <label>Correo Electrónico *</label>
+                      <label>email Electrónico *</label>
                       <input
                         type="email"
                         required
-                        value={formData.correo}
-                        onChange={(e) => setFormData({...formData, correo: e.target.value})}
-                        placeholder="correo@ejemplo.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        placeholder="email@ejemplo.com"
                       />
                     </div>
                     

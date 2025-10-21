@@ -581,7 +581,7 @@ const InvoicesSection = () => {
                       <Download className="w-4 h-4 mr-2" />
                       Descargar PDF
                     </button>
-                    <button className="btn-secondary" onClick={() => alert('Enviando por correo...')}>
+                    <button className="btn-secondary" onClick={() => alert('Enviando por email...')}>
                       <Send className="w-4 h-4 mr-2" />
                       Enviar por Email
                     </button>

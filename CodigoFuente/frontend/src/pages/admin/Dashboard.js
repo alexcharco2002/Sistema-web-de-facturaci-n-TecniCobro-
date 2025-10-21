@@ -1,5 +1,7 @@
 // src/pages/admin/Dashboard.js
-// Dashboard.js - Admin Dashboard Component (Refactorizado)
+// Panel de Administración - Dashboard.js
+
+//importar librerías y servicios
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../../services/authServices';
@@ -9,8 +11,11 @@ import NotificationDropdown from '../../components/NotificationDropdown';
 import UserProfile from '../../components/UserProfile';
 import UsersSection from '../../components/UsersSection';
 import InvoicesSection from '../../components/InvoicesSection';
+
+//Importar estilos
 import './style.css';
 
+// Importar iconos
 import { 
   Users, 
   FileText, 
@@ -35,7 +40,6 @@ import {
   MapPin,
   Shield
 } from 'lucide-react';
-
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('overview');
@@ -543,18 +547,18 @@ const AdminDashboard = () => {
                       <div className="form-group">
                         <label className="form-label">
                           <Mail className="w-4 h-4" />
-                          Correo Electrónico
+                          email Electrónico
                         </label>
                         {editingProfile ? (
                           <input
                             type="email"
                             className="form-input"
-                            value={profileData.correo || ''}
-                            onChange={(e) => handleProfileInputChange('correo', e.target.value)}
-                            placeholder="correo@ejemplo.com"
+                            value={profileData.email || ''}
+                            onChange={(e) => handleProfileInputChange('email', e.target.value)}
+                            placeholder="email@ejemplo.com"
                           />
                         ) : (
-                          <div className="form-value">{profileData.correo || 'No especificado'}</div>
+                          <div className="form-value">{profileData.email || 'No especificado'}</div>
                         )}
                       </div>
 

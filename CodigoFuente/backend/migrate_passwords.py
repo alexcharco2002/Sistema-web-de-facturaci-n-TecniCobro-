@@ -116,7 +116,7 @@ def create_test_user():
             nombres="Administrador",
             apellidos="Sistema",
             cedula="0000000000",
-            correo="admin@sistema.com",
+            email="admin@sistema.com",
             rol="admin",
             fecha_registro=datetime.now()
         )

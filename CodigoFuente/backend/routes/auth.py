@@ -86,7 +86,7 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
                 "apellidos": db_user.apellidos,
                 "nombre_completo": f"{db_user.nombres} {db_user.apellidos}",
                 "rol": db_user.rol,
-                "correo": db_user.correo,
+                "email": db_user.email,
                 "foto": foto_url
             }
         }
@@ -123,7 +123,7 @@ def verify_session(payload: dict = Depends(verify_token), db: Session = Depends(
         "nombres": db_user.nombres,
         "apellidos": db_user.apellidos,
         "nombre_completo": f"{db_user.nombres} {db_user.apellidos}",
-        "correo": db_user.correo,
+        "email": db_user.email,
         "rol": db_user.rol,
         "fecha_registro": db_user.fecha_registro.isoformat() if db_user.fecha_registro else None,
         "foto": foto_url
@@ -154,7 +154,7 @@ def get_profile(payload: dict = Depends(verify_token), db: Session = Depends(get
         "apellidos": db_user.apellidos,
         "nombre_completo": f"{db_user.nombres} {db_user.apellidos}",
         "cedula": db_user.cedula,
-        "correo": db_user.correo,
+        "email": db_user.email,
         "telefono": getattr(db_user, 'telefono', None),
         "direccion": getattr(db_user, 'direccion', None),
         "rol": db_user.rol,

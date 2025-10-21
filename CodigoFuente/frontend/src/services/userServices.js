@@ -160,7 +160,7 @@ class UsersService {
           nombres: userData.nombres.trim(),
           apellidos: userData.apellidos.trim(),
           cedula: userData.cedula.trim(),
-          correo: userData.correo.trim().toLowerCase(),
+          email: userData.email.trim().toLowerCase(),
           telefono: userData.telefono?.trim() || null,
           direccion: userData.direccion?.trim() || null,
           rol: userData.rol || 'cliente',
@@ -198,7 +198,7 @@ class UsersService {
       if (userData.nombres) updateData.nombres = userData.nombres.trim();
       if (userData.apellidos) updateData.apellidos = userData.apellidos.trim();
       if (userData.cedula) updateData.cedula = userData.cedula.trim();
-      if (userData.correo) updateData.correo = userData.correo.trim().toLowerCase();
+      if (userData.email) updateData.email = userData.email.trim().toLowerCase();
       if (userData.telefono !== undefined) updateData.telefono = userData.telefono?.trim() || null;
       if (userData.direccion !== undefined) updateData.direccion = userData.direccion?.trim() || null;
       if (userData.rol) updateData.rol = userData.rol;
@@ -383,8 +383,8 @@ class UsersService {
         throw new Error('La cédula debe tener al menos 8 caracteres');
       }
 
-      if (!userData.correo || !this.isValidEmail(userData.correo)) {
-        throw new Error('Debe proporcionar un correo electrónico válido');
+      if (!userData.email || !this.isValidEmail(userData.email)) {
+        throw new Error('Debe proporcionar un email electrónico válido');
       }
     } else {
       // Validaciones para actualización (solo si el campo está presente)
@@ -396,8 +396,8 @@ class UsersService {
         throw new Error('La contraseña debe tener al menos 6 caracteres');
       }
 
-      if (userData.correo && !this.isValidEmail(userData.correo)) {
-        throw new Error('Debe proporcionar un correo electrónico válido');
+      if (userData.email && !this.isValidEmail(userData.email)) {
+        throw new Error('Debe proporcionar un email electrónico válido');
       }
     }
 
@@ -451,6 +451,33 @@ class UsersService {
         success: false,
         message: error.message || 'Error al obtener estadísticas'
       };
+    }
+  }
+  /**
+ * Actualizar usuario actual en localStorage
+ */
+  updateCurrentUser(userData) {
+    try {
+      const currentUser = this.getCurrentUser();
+      if (!currentUser) {
+        return { success: false, message: 'No hay usuario autenticado' };
+      }
+
+      // Combinar datos actuales con los nuevos
+      const updatedUser = {
+        ...currentUser,
+        ...userData
+      };
+
+      // Guardar en localStorage
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      console.log('✅ Usuario actualizado en localStorage');
+      
+      return { success: true, data: updatedUser };
+    } catch (error) {
+      console.error('❌ Error actualizando usuario:', error);
+      return { success: false, message: error.message };
     }
   }
 }
