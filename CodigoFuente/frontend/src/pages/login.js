@@ -1,5 +1,5 @@
 // fronted pagina de INICIO DE SESION
-// src/components/Login.js 
+// src/pages/Login.js 
 // Este componente maneja el inicio de sesión del usuario, validaciones y redirección según el perfil.
 import React, { useState, useEffect } from 'react'; 
 import { User, Lock, Eye, EyeOff, Droplets, AlertCircle } from 'lucide-react';
@@ -25,7 +25,6 @@ const Login = () => { // Estado del componente, inicializa los datos del formula
         // Redireccionar a la página correspondiente según el rol
         window.location.href = redirectByProfile(user.rol);
       }
-
     }
   }, []);
 
@@ -58,8 +57,8 @@ const Login = () => { // Estado del componente, inicializa los datos del formula
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+    if (formData.password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres');
       return;
     }
 
@@ -82,8 +81,8 @@ const Login = () => { // Estado del componente, inicializa los datos del formula
         // Redireccionar según el perfil
         setTimeout(() => {
           if (user && user.rol) {
-              window.location.href = redirectByProfile(user.rol);
-          }else {
+            window.location.href = redirectByProfile(user.rol);
+          } else {
             // Fallback si no hay perfil definido
             window.location.href = '/dashboard';
           }
@@ -91,36 +90,31 @@ const Login = () => { // Estado del componente, inicializa los datos del formula
         
       } else {
         console.log('🔎 response.message:', response.message);
+        
+        // Manejo mejorado del mensaje de error
+        let errorMessage = 'Error en el login';
+        
         if (typeof response.message === 'string') {
-          setError(response.message);
+          errorMessage = response.message;
         } else if (response.message && typeof response.message === 'object') {
           // Intenta mostrar algún campo dentro del objeto
           const values = Object.values(response.message);
-          setError(values.length ? values[0] : 'Error en el login');
-        } else {
-          setError('Error en el login');
+          errorMessage = values.length ? values[0] : 'Error en el login';
         }
-
-        setError(
-          typeof response.message === 'string'
-            ? response.message
-            : JSON.stringify(response.message)
-        );
-
+        
+        setError(errorMessage);
       }
     } catch (err) {
       console.error('Error de login:', err);
-      setError(
-      typeof err.message === 'string'
+      const errorMessage = typeof err.message === 'string'
         ? err.message
-        : 'Error de conexión. Verifica tu conexión a internet.'
-      );
-
+        : 'Error de conexión. Verifica tu conexión a internet.';
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
-
 
   return (
     <div className="login-container">
@@ -158,51 +152,57 @@ const Login = () => { // Estado del componente, inicializa los datos del formula
             )}
 
             {/* Campo Usuario */}
-            <div className="input-group">
-              <label className="input-label">Usuario</label>
-              <div className="input-container">
-                <User className="input-icon" />
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleInputChange}
-                  onKeyPress={handleKeyPress}
-                  className="form-input"
-                  placeholder="Ingresa tu usuario"
-                  disabled={isLoading}
-                  autoComplete="username"
-                />
-              </div>
-            </div>
+<div className="input-group">
+  <label htmlFor="username" className="input-label">
+    <User className="label-icon" /> {/* Icono al lado del label */}
+    Usuario
+  </label>
+  <input
+    id="username"
+    type="text"
+    name="username"
+    value={formData.username}
+    onChange={handleInputChange}
+    onKeyPress={handleKeyPress}
+    className="form-input"
+    placeholder="Ingresa tu usuario"
+    disabled={isLoading}
+    autoComplete="username"
+  />
+</div>
 
-            {/* Campo Contraseña */}
-            <div className="input-group">
-              <label className="input-label">Contraseña</label>
-              <div className="input-container">
-                <Lock className="input-icon" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  onKeyPress={handleKeyPress}
-                  className="form-input password-input"
-                  placeholder="Ingresa tu contraseña"
-                  disabled={isLoading}
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="password-toggle"
-                  disabled={isLoading}
-                  tabIndex="-1"
-                >
-                  {showPassword ? <EyeOff className="toggle-icon" /> : <Eye className="toggle-icon" />}
-                </button>
-              </div>
-            </div>
+{/* Campo Contraseña */}
+<div className="input-group">
+  <label htmlFor="password" className="input-label">
+    <Lock className="label-icon" /> {/* Icono al lado del label */}
+    Contraseña
+  </label>
+  <div className="input-container">
+    <input
+      id="password"
+      type={showPassword ? "text" : "password"}
+      name="password"
+      value={formData.password}
+      onChange={handleInputChange}
+      onKeyPress={handleKeyPress}
+      className="form-input password-input"
+      placeholder="Ingresa tu contraseña"
+      disabled={isLoading}
+      autoComplete="current-password"
+    />
+    <button
+      type="button"
+      onClick={() => setShowPassword(!showPassword)}
+      className="password-toggle"
+      disabled={isLoading}
+      tabIndex="-1"
+      aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+    >
+      {showPassword ? <EyeOff className="toggle-icon" /> : <Eye className="toggle-icon" />}
+    </button>
+  </div>
+</div>
+
 
             {/* Botón de login */}
             <button

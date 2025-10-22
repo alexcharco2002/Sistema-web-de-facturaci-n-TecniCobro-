@@ -6,7 +6,7 @@
 import authService from './authServices';
 
 const API_CONFIG = {
-  baseURL: 'http://localhost:8000',
+  baseURL: 'https://localhost:8000',
   endpoints: {
     users: '/users',
     toggleStatus: (id) => `/users/${id}/toggle-status`,
@@ -285,8 +285,8 @@ class UsersService {
         throw new Error('Nueva contraseña es requerida');
       }
 
-      if (passwords.newPassword.length < 6) {
-        throw new Error('La nueva contraseña debe tener al menos 6 caracteres');
+      if (passwords.newPassword.length < 8) {
+        throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
       }
 
       const data = await this.makeRequest(API_CONFIG.endpoints.changePassword(userId), {
@@ -367,8 +367,8 @@ class UsersService {
         throw new Error('El usuario debe tener al menos 3 caracteres');
       }
 
-      if (!userData.clave || userData.clave.length < 6) {
-        throw new Error('La contraseña debe tener al menos 6 caracteres');
+      if (!userData.clave || userData.clave.length < 8) {
+        throw new Error('La contraseña debe tener al menos 8 caracteres');
       }
 
       if (!userData.nombres || userData.nombres.trim().length < 2) {
@@ -392,8 +392,8 @@ class UsersService {
         throw new Error('El usuario debe tener al menos 3 caracteres');
       }
 
-      if (userData.clave && userData.clave.length < 6) {
-        throw new Error('La contraseña debe tener al menos 6 caracteres');
+      if (userData.clave && userData.clave.length < 8) {
+        throw new Error('La contraseña debe tener al menos 8 caracteres');
       }
 
       if (userData.email && !this.isValidEmail(userData.email)) {
@@ -403,9 +403,9 @@ class UsersService {
 
     // Validar rol si está presente
     if (userData.rol) {
-      const rolesValidos = ['admin', 'cliente', 'operador'];
+      const rolesValidos = ['cliente', 'lector', 'cajero', 'administraador' ];
       if (!rolesValidos.includes(userData.rol)) {
-        throw new Error('El rol debe ser admin, cliente u operador');
+        throw new Error('El rol debe ser administrador, lector, cajero u cliente');
       }
     }
   }

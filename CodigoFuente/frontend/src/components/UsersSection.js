@@ -170,8 +170,8 @@ const UsersSection = () => {
       
       if (modalType === 'create') {
         // Validar que se haya ingresado contraseña
-        if (!formData.clave || formData.clave.length < 6) {
-          setError('La contraseña debe tener al menos 6 caracteres');
+        if (!formData.clave || formData.clave.length < 8) {
+          setError('La contraseña debe tener al menos 8 caracteres');
           return;
         }
         
@@ -209,8 +209,8 @@ const UsersSection = () => {
       return;
     }
 
-    if (passwordData.newPassword.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+    if (passwordData.newPassword.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres');
       return;
     }
 
@@ -623,8 +623,8 @@ const UsersSection = () => {
                           required
                           value={formData.clave}
                           onChange={(e) => setFormData({...formData, clave: e.target.value})}
-                          placeholder="Contraseña (min. 6 caracteres)"
-                          minLength="6"
+                          placeholder="Contraseña (min. 8 caracteres)"
+                          minLength="8"
                         />
                       </div>
                     )}
@@ -701,8 +701,10 @@ const UsersSection = () => {
                         onChange={(e) => setFormData({...formData, rol: e.target.value})}
                       >
                         <option value="cliente">Cliente</option>
-                        <option value="operador">Operador</option>
-                        <option value="admin">Administrador</option>
+                        <option value="lector">Lector</option>
+                        <option value="cajero">Cajero</option>
+                        <option value="administrador">Administrador</option>
+
                       </select>
                     </div>
                     
@@ -750,10 +752,10 @@ const UsersSection = () => {
                       <input
                         type="password"
                         required
-                        minLength="6"
+                        minLength="8"
                         value={passwordData.newPassword}
                         onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
-                        placeholder="Nueva contraseña (min. 6 caracteres)"
+                        placeholder="Nueva contraseña (min. 8 caracteres)"
                       />
                     </div>
                     
@@ -762,7 +764,7 @@ const UsersSection = () => {
                       <input
                         type="password"
                         required
-                        minLength="6"
+                        minLength="8"
                         value={passwordData.confirmPassword}
                         onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
                         placeholder="Confirmar nueva contraseña"

@@ -84,7 +84,7 @@ class UserCreate(BaseModel):
     
     @validator('rol')
     def validate_rol(cls, v):
-        roles_validos = ['admin', 'cliente', 'operador']
+        roles_validos = ['cliente', 'lector', 'cajero', 'administraador' ]
         if v not in roles_validos:
             raise ValueError(f'El rol debe ser uno de: {", ".join(roles_validos)}')
         return v
@@ -180,7 +180,7 @@ class UserUpdate(BaseModel):
     @validator('rol')
     def validate_rol(cls, v):
         if v:
-            roles_validos = ['admin', 'cliente', 'operador']
+            roles_validos = ['cliente', 'lector', 'cajero', 'administraador' ]
             if v not in roles_validos:
                 raise ValueError(f'El rol debe ser uno de: {", ".join(roles_validos)}')
         return v

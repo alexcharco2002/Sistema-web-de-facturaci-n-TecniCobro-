@@ -76,7 +76,7 @@ def get_users(
     Requiere autenticación
     """
     # Verificar que el usuario tenga permisos (solo admin)
-    if payload.get("rol") != "ADMINISTRADOR":
+    if payload.get("rol") != "administrador":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para ver la lista de usuarios"
@@ -124,7 +124,7 @@ def get_user(
     Obtiene un usuario específico por ID
     """
     # Verificar permisos: admin o el mismo usuario
-    if payload.get("rol") != "admin":
+    if payload.get("rol") != "administrador":
         # Obtener el cod_usuario_sistema del usuario actual
         current_user = db.query(UsuarioSistema).filter(
             UsuarioSistema.usuario == payload["sub"]
@@ -163,7 +163,7 @@ def create_user(
     Solo admin puede crear usuarios
     """
     # Verificar que el usuario sea admin
-    if payload.get("rol") != "ADMINISTRADOR":
+    if payload.get("rol") != "administrador":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para crear usuarios"
@@ -263,7 +263,7 @@ def update_user(
         )
     
     # Verificar permisos
-    if payload.get("rol") != "admin":
+    if payload.get("rol") != "administrador":
         current_user = db.query(UsuarioSistema).filter(
             UsuarioSistema.usuario == payload["sub"]
         ).first()
@@ -357,7 +357,7 @@ def delete_user(
     Solo admin puede eliminar usuarios
     """
     # Verificar que el usuario sea admin
-    if payload.get("rol") != "admin":
+    if payload.get("rol") != "administrador":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para eliminar usuarios"
@@ -416,7 +416,7 @@ def toggle_user_status(
     Activa o desactiva un usuario
     Solo admin puede cambiar el estado
     """
-    if payload.get("rol") != "admin":
+    if payload.get("rol") != "administrador":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para cambiar el estado de usuarios"
@@ -477,7 +477,7 @@ def change_user_password(
     ).first()
     
     # Verificar que sea el mismo usuario o admin
-    if payload.get("rol") != "admin" and (not current_user or current_user.cod_usuario_sistema != user_id):
+    if payload.get("rol") != "administrador" and (not current_user or current_user.cod_usuario_sistema != user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para cambiar esta contraseña"
@@ -495,7 +495,7 @@ def change_user_password(
         )
     
     # Verificar contraseña actual (solo si no es admin)
-    if payload.get("rol") != "admin":
+    if payload.get("rol") != "administrador":
         if not verify_password(password_data.current_password, user.clave):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -543,7 +543,7 @@ async def upload_user_photo(
     Sube o actualiza la foto de perfil de un usuario
     """
     # Verificar permisos
-    if payload.get("rol") != "admin":
+    if payload.get("rol") != "administrador":
         current_user = db.query(UsuarioSistema).filter(
             UsuarioSistema.usuario == payload["sub"]
         ).first()

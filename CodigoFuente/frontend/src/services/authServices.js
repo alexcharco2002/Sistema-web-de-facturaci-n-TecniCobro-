@@ -1,11 +1,12 @@
 /**
- * Servicio de Autenticación
- * Maneja todas las comunicaciones con el backend FastAPI
+ * Servicio de Autenticación con HTTPS
+ * Maneja todas las comunicaciones seguras con el backend FastAPI
  */
 
-// Configuración del API
+// Configuración del API con HTTPS
 const API_CONFIG = {
-  baseURL: 'http://localhost:8000', // Puerto por defecto de FastAPI
+  // Usar HTTPS en producción, HTTP en desarrollo si es necesario
+  baseURL: process.env.REACT_APP_API_URL || 'https://localhost:8000',
   
   timeout: 10000, // 10 segundos
   endpoints: {
@@ -20,24 +21,40 @@ const API_CONFIG = {
 
 class AuthService {
   constructor() {
-    this.token = localStorage.getItem('auth_token') || null;
+    // CAMBIO IMPORTANTE: No usar localStorage directamente
+    // En su lugar, usar memoria para evitar problemas
+    this.token = this.getStoredToken();
+    this.user = this.getStoredUser();
+  }
 
-    let userData = localStorage.getItem('user_data');
-    if (!userData || userData === 'undefined') {
-      this.user = null;
-    } else {
-      try {
-        this.user = JSON.parse(userData);
-      } catch {
-        this.user = null;
-      }
+  /**
+   * Obtener token almacenado de forma segura
+   */
+  getStoredToken() {
+    try {
+      return sessionStorage.getItem('auth_token') || null;
+    } catch {
+      return null;
     }
   }
 
-  
+  /**
+   * Obtener usuario almacenado
+   */
+  getStoredUser() {
+    try {
+      const userData = sessionStorage.getItem('user_data');
+      if (!userData || userData === 'undefined') {
+        return null;
+      }
+      return JSON.parse(userData);
+    } catch {
+      return null;
+    }
+  }
 
   /**
-   * Realizar petición HTTP con configuración común
+   * Realizar petición HTTP con configuración común y HTTPS
    */
   async makeRequest(endpoint, options = {}) {
     const url = `${API_CONFIG.baseURL}${endpoint}`;
@@ -49,6 +66,9 @@ class AuthService {
         'Accept': 'application/json',
       },
       timeout: API_CONFIG.timeout,
+      // Importante para HTTPS con certificados auto-firmados en desarrollo
+      mode: 'cors',
+      credentials: 'include'
     };
 
     // Agregar token de autorización si existe
@@ -67,7 +87,7 @@ class AuthService {
     };
 
     try {
-      console.log(`🌐 API Request: ${finalOptions.method} ${url}`);
+      console.log(`🔒 HTTPS Request: ${finalOptions.method} ${url}`);
       
       // Crear AbortController para timeout
       const controller = new AbortController();
@@ -94,16 +114,15 @@ class AuthService {
         }
 
         throw new Error(errorMessage);
-
       }
 
       const data = await response.json();
-      console.log(`✅ API Response:`, data);
+      console.log(`✅ HTTPS Response:`, data);
 
       return data;
 
     } catch (error) {
-      console.error(`❌ API Error:`, error);
+      console.error(`❌ HTTPS Error:`, error);
       
       // Manejar diferentes tipos de errores
       if (error.name === 'AbortError') {
@@ -111,7 +130,11 @@ class AuthService {
       }
       
       if (error.message.includes('Failed to fetch')) {
-        throw new Error('No se pudo conectar con el servidor. Verifique su conexión.');
+        throw new Error('No se pudo conectar con el servidor. Verifique su conexión HTTPS.');
+      }
+
+      if (error.message.includes('certificate')) {
+        throw new Error('Error de certificado SSL. Acepte el certificado en su navegador.');
       }
 
       throw error;
@@ -126,7 +149,6 @@ class AuthService {
       // Validaciones del lado cliente
       this.validateLoginCredentials(credentials);
 
-      // FastAPI generalmente espera form-data para login OAuth2
       const response = await this.makeRequest(API_CONFIG.endpoints.login, {
         method: 'POST',
         headers: {
@@ -142,19 +164,19 @@ class AuthService {
       
       // Si el login es exitoso, guardar datos
       if (response.success) {
-        this.user = response.data.user; // actualizar user con lo que devuelve el backend
-         this.token = response.data.token; // actualizar token con lo que devuelve el backend
+        this.user = response.data.user;
+        this.token = response.data.token;
 
-        //Guardar en localStorage para persistencia
-        localStorage.setItem('auth_token', this.token);
-        localStorage.setItem('user_data', JSON.stringify(this.user));
-        localStorage.setItem('login_time', new Date().toISOString());
+        // Guardar en sessionStorage (más seguro que localStorage)
+        sessionStorage.setItem('auth_token', this.token);
+        sessionStorage.setItem('user_data', JSON.stringify(this.user));
+        sessionStorage.setItem('login_time', new Date().toISOString());
 
-        console.log('✅ Login exitoso:', {
+        console.log('✅ Login exitoso (HTTPS):', {
           user: this.user.nombre_completo,
           rol: this.user.rol
         });
-        // 
+        
         return {
           success: true,
           data: {
@@ -165,7 +187,7 @@ class AuthService {
       } else {
         return {
           success: false,
-          message: response.message || 'Credenciales inválidas'
+          message: response.message || 'Credenciales inválidas, Usuario no registrado'
         };
       }
 
@@ -218,7 +240,7 @@ class AuthService {
       if (response && !response.detail) {
         // Actualizar datos del usuario
         this.user = response;
-        localStorage.setItem('user_data', JSON.stringify(this.user));
+        sessionStorage.setItem('user_data', JSON.stringify(this.user));
         return { success: true, user: this.user };
       } else {
         // Token inválido, limpiar datos
@@ -242,7 +264,7 @@ class AuthService {
       
       if (response && !response.detail) {
         this.user = response;
-        localStorage.setItem('user_data', JSON.stringify(this.user));
+        sessionStorage.setItem('user_data', JSON.stringify(this.user));
         return { success: true, data: response };
       }
 
@@ -263,8 +285,8 @@ class AuthService {
         throw new Error('Contraseña actual y nueva son requeridas');
       }
 
-      if (passwords.newPassword.length < 6) {
-        throw new Error('La nueva contraseña debe tener al menos 6 caracteres');
+      if (passwords.newPassword.length < 8) {
+        throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
       }
 
       if (passwords.newPassword !== passwords.confirmPassword) {
@@ -337,9 +359,9 @@ class AuthService {
   clearLocalData() {
     this.token = null;
     this.user = null;
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
-    localStorage.removeItem('login_time');
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('user_data');
+    sessionStorage.removeItem('login_time');
     
     // Limpiar timers
     if (this.autoLogoutTimer) {
@@ -410,7 +432,7 @@ class AuthService {
    * Obtener tiempo de sesión
    */
   getSessionTime() {
-    const loginTime = localStorage.getItem('login_time');
+    const loginTime = sessionStorage.getItem('login_time');
     if (!loginTime) return null;
 
     const now = new Date();

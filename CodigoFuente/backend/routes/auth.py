@@ -45,14 +45,14 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     if not db_user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales inválidas"
+            detail="Credenciales inválidas, Usuario no registrado"
         )
     
     # Verificar contraseña usando bcrypt
     if not verify_password(user.password.strip(), db_user.clave):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales inválidas"
+            detail="Credenciales inválidas, Usuario no registrado"
         )
     
     # Verificar si el usuario está activo (si el campo existe)

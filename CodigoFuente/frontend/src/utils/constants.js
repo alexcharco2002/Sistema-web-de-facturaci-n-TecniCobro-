@@ -6,7 +6,7 @@ export const USER_PROFILES = {
 };
 
 export const PROFILE_NAMES = {
-  [USER_PROFILES.ADMIN]: 'Administrador',
+  [USER_PROFILES.ADMIN]: 'administrador',
   [USER_PROFILES.TESORERO]: 'Tesorero',
   [USER_PROFILES.LECTOR]: 'Lector',
   [USER_PROFILES.USUARIO]: 'Usuario'
