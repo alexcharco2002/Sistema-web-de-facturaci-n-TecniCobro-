@@ -558,3 +558,584 @@
   border-color: var(--success-color);
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
 }
+
+/* Agregar estos estilos a tu Login.css existente */
+
+/* Mensajes de error mejorados */
+.error-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #fee 0%, #fdd 100%);
+  border: 1px solid #fcc;
+  border-left: 4px solid #e74c3c;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.error-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.error-content strong {
+  color: #c0392b;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.error-content p {
+  margin: 0;
+  color: #555;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.error-detail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #666;
+}
+
+/* Error de advertencia (3+ intentos fallidos) */
+.error-warning {
+  background: linear-gradient(135deg, #fff4e6 0%, #ffe8cc 100%);
+  border-color: #ffd699;
+  border-left-color: #ff9800;
+}
+
+.error-warning strong {
+  color: #e65100;
+}
+
+.warning-details {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.warning-text {
+  font-size: 12px;
+  color: #666;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+}
+
+.warning-text.danger {
+  background: rgba(255, 0, 0, 0.05);
+  color: #c62828;
+  font-weight: 500;
+}
+
+/* Error de bloqueo temporal */
+.error-blocked-temporal {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  border-color: #ffcc80;
+  border-left-color: #fb8c00;
+}
+
+.error-blocked-temporal strong {
+  color: #e65100;
+}
+
+/* Error de bloqueo permanente */
+.error-blocked-permanent {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+  border-color: #ef9a9a;
+  border-left-color: #d32f2f;
+}
+
+.error-blocked-permanent strong {
+  color: #b71c1c;
+}
+
+/* Iconos de error */
+.error-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: #e74c3c;
+  margin-top: 2px;
+}
+
+.error-icon-warning {
+  color: #ff9800;
+}
+
+.error-icon-blocked {
+  color: #d32f2f;
+}
+
+/* Botón deshabilitado cuando está bloqueado */
+.login-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Sección de contacto al administrador */
+.contact-admin {
+  margin-top: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid #dee2e6;
+}
+
+.contact-admin p {
+  margin: 0 0 10px 0;
+  color: #495057;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.admin-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.admin-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* Animación de entrada */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animación de pulso para advertencias críticas */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.error-blocked-permanent,
+.error-warning .warning-text.danger {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Inputs deshabilitados cuando está bloqueado */
+.form-input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .error-content strong {
+    font-size: 13px;
+  }
+  
+  .error-content p {
+    font-size: 12px;
+  }
+  
+  .warning-text {
+    font-size: 11px;
+  }
+  
+  .contact-admin {
+    padding: 12px;
+  }
+  
+  .admin-link {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+}
+
+/* ============================================
+   ESTILOS PARA RECUPERACIÓN DE CONTRASEÑA
+   ============================================ */
+
+/* Contenedor de éxito */
+.success-container {
+  text-align: center;
+  padding: 30px 20px;
+}
+
+.success-icon {
+  margin-bottom: 20px;
+  animation: scaleIn 0.5s ease-out;
+}
+
+.success-content {
+  margin: 20px 0;
+}
+
+.success-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 10px;
+}
+
+.success-message {
+  font-size: 1rem;
+  color: #6b7280;
+  margin-bottom: 20px;
+}
+
+.success-text {
+  font-size: 1.1rem;
+  color: #22c55e;
+  margin: 20px 0;
+  font-weight: 500;
+}
+
+.redirect-text {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-top: 10px;
+}
+
+/* Instrucciones de éxito */
+.success-instructions {
+  background-color: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.success-instructions h3 {
+  color: #15803d;
+  font-size: 1rem;
+  margin-bottom: 10px;
+}
+
+.success-instructions ol {
+  list-style: decimal;
+  margin-left: 20px;
+  color: #166534;
+}
+
+.success-instructions ol li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.success-notes {
+  background-color: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 20px;
+  text-align: left;
+}
+
+.success-notes p {
+  color: #92400e;
+  font-size: 0.9rem;
+  margin: 5px 0;
+}
+
+/* Contenedor de error */
+.error-container {
+  text-align: center;
+  padding: 30px 20px;
+}
+
+.error-text {
+  font-size: 1rem;
+  color: #ef4444;
+  margin: 20px 0;
+  font-weight: 500;
+}
+
+.error-actions {
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* Contenedor de carga */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 20px;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: #3b82f6;
+}
+
+/* Contenedor de input de contraseña */
+.password-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.password-toggle:hover {
+  color: #3b82f6;
+}
+
+.password-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Indicador de fortaleza de contraseña */
+.password-strength {
+  margin-top: 8px;
+}
+
+.strength-bar {
+  height: 4px;
+  background-color: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+
+.strength-fill {
+  height: 100%;
+  transition: all 0.3s ease;
+}
+
+.strength-fill.strength-0,
+.strength-fill.strength-1 {
+  background-color: #ef4444;
+}
+
+.strength-fill.strength-2 {
+  background-color: #f97316;
+}
+
+.strength-fill.strength-3 {
+  background-color: #eab308;
+}
+
+.strength-fill.strength-4 {
+  background-color: #84cc16;
+}
+
+.strength-fill.strength-5,
+.strength-fill.strength-6 {
+  background-color: #22c55e;
+}
+
+.strength-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.strength-level {
+  font-weight: 600;
+}
+
+.strength-level.strength-0,
+.strength-level.strength-1 {
+  color: #ef4444;
+}
+
+.strength-level.strength-2 {
+  color: #f97316;
+}
+
+.strength-level.strength-3 {
+  color: #eab308;
+}
+
+.strength-level.strength-4 {
+  color: #84cc16;
+}
+
+.strength-level.strength-5,
+.strength-level.strength-6 {
+  color: #22c55e;
+}
+
+.strength-feedback {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+/* Indicador de coincidencia de contraseña */
+.password-match {
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.match-success {
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.match-error {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+/* Requisitos de contraseña */
+.password-requirements {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 15px;
+  margin: 15px 0;
+}
+
+.requirements-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 10px;
+}
+
+.requirements-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.requirements-list li {
+  font-size: 0.85rem;
+  color: #6b7280;
+  padding: 5px 0;
+  padding-left: 25px;
+  position: relative;
+}
+
+.requirements-list li::before {
+  content: '○';
+  position: absolute;
+  left: 5px;
+  color: #9ca3af;
+}
+
+.requirements-list li.requirement-met {
+  color: #22c55e;
+}
+
+.requirements-list li.requirement-met::before {
+  content: '✓';
+  color: #22c55e;
+  font-weight: bold;
+}
+
+/* Mensaje de éxito (reutilizable) */
+.success-message {
+  background-color: #d1fae5;
+  border: 1px solid #6ee7b7;
+  color: #065f46;
+}
+
+/* Icono inline */
+.inline-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 5px;
+  width: 18px;
+  height: 18px;
+}
+
+/* Animaciones */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .success-container,
+  .error-container {
+    padding: 20px 10px;
+  }
+
+  .success-icon svg,
+  .error-container svg {
+    width: 48px;
+    height: 48px;
+  }
+
+  .success-title {
+    font-size: 1.25rem;
+  }
+
+  .password-requirements {
+    padding: 12px;
+  }
+
+  .requirements-list li {
+    font-size: 0.8rem;
+  }
+}

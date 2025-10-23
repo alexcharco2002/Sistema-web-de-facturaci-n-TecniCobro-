@@ -1,28 +1,29 @@
 /**
  * Servicio de Autenticación con HTTPS
- * Maneja todas las comunicaciones seguras con el backend FastAPI
+ * Incluye funcionalidad de recuperación de contraseña
  */
 
 // Configuración del API con HTTPS
 const API_CONFIG = {
-  // Usar HTTPS en producción, HTTP en desarrollo si es necesario
   baseURL: process.env.REACT_APP_API_URL || 'https://localhost:8000',
-  
-  timeout: 10000, // 10 segundos
+  timeout: 10000,
   endpoints: {
     login: '/login',
     logout: '/logout',
     verifySession: '/verify-session',
     profile: '/profile',
     changePassword: '/change-password',
-    healthCheck: '/health'
+    healthCheck: '/health',
+    // Nuevos endpoints para recuperación de contraseña
+    forgotPassword: '/forgot-password',
+    verifyCode: '/verify-code',
+    resetPassword: '/reset-password',
+    resendCode: '/resend-code'
   }
 };
 
 class AuthService {
   constructor() {
-    // CAMBIO IMPORTANTE: No usar localStorage directamente
-    // En su lugar, usar memoria para evitar problemas
     this.token = this.getStoredToken();
     this.user = this.getStoredUser();
   }
@@ -66,17 +67,14 @@ class AuthService {
         'Accept': 'application/json',
       },
       timeout: API_CONFIG.timeout,
-      // Importante para HTTPS con certificados auto-firmados en desarrollo
       mode: 'cors',
       credentials: 'include'
     };
 
-    // Agregar token de autorización si existe
     if (this.token && !options.skipAuth) {
       defaultOptions.headers['Authorization'] = `Bearer ${this.token}`;
     }
 
-    // Combinar opciones
     const finalOptions = {
       ...defaultOptions,
       ...options,
@@ -89,7 +87,6 @@ class AuthService {
     try {
       console.log(`🔒 HTTPS Request: ${finalOptions.method} ${url}`);
       
-      // Crear AbortController para timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), finalOptions.timeout);
       
@@ -100,7 +97,6 @@ class AuthService {
 
       clearTimeout(timeoutId);
 
-      // Verificar si la respuesta es exitosa
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         let errorMessage = '';
@@ -124,7 +120,6 @@ class AuthService {
     } catch (error) {
       console.error(`❌ HTTPS Error:`, error);
       
-      // Manejar diferentes tipos de errores
       if (error.name === 'AbortError') {
         throw new Error('La petición tardó demasiado tiempo');
       }
@@ -146,7 +141,6 @@ class AuthService {
    */
   async login(credentials) {
     try {
-      // Validaciones del lado cliente
       this.validateLoginCredentials(credentials);
 
       const response = await this.makeRequest(API_CONFIG.endpoints.login, {
@@ -162,12 +156,10 @@ class AuthService {
         skipAuth: true,
       });
       
-      // Si el login es exitoso, guardar datos
       if (response.success) {
         this.user = response.data.user;
         this.token = response.data.token;
 
-        // Guardar en sessionStorage (más seguro que localStorage)
         sessionStorage.setItem('auth_token', this.token);
         sessionStorage.setItem('user_data', JSON.stringify(this.user));
         sessionStorage.setItem('login_time', new Date().toISOString());
@@ -200,19 +192,144 @@ class AuthService {
     }
   }
 
+ // Agregar estos métodos a tu clase AuthService existente
+
+/**
+ * Solicitar código de recuperación de contraseña
+ */
+async forgotPassword(email) {
+  try {
+    if (!email || !email.trim()) {
+      throw new Error('El correo electrónico es requerido');
+    }
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Formato de correo electrónico inválido');
+    }
+
+    const response = await this.makeRequest(API_CONFIG.endpoints.forgotPassword || '/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      skipAuth: true,
+    });
+
+    return response;
+
+  } catch (error) {
+    console.error('❌ Error en forgotPassword:', error);
+    return {
+      success: false,
+      message: error.message || 'Error al solicitar recuperación de contraseña'
+    };
+  }
+}
+
+/**
+ * Verificar código de recuperación
+ */
+async verifyRecoveryCode(email, code) {
+  try {
+    if (!email || !code) {
+      throw new Error('Email y código son requeridos');
+    }
+
+    if (code.length !== 6) {
+      throw new Error('El código debe tener 6 dígitos');
+    }
+
+    const response = await this.makeRequest(API_CONFIG.endpoints.verifyCode || '/verify-code', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        code: code.trim()
+      }),
+      skipAuth: true,
+    });
+
+    return response;
+
+  } catch (error) {
+    console.error('❌ Error en verifyRecoveryCode:', error);
+    return {
+      success: false,
+      message: error.message || 'Error al verificar el código'
+    };
+  }
+}
+
+/**
+ * Restablecer contraseña
+ */
+async resetPassword(email, resetToken, newPassword) {
+  try {
+    if (!email || !resetToken || !newPassword) {
+      throw new Error('Todos los campos son requeridos');
+    }
+
+    if (newPassword.length < 8) {
+      throw new Error('La contraseña debe tener al menos 8 caracteres');
+    }
+
+    const response = await this.makeRequest(API_CONFIG.endpoints.resetPassword || '/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        reset_token: resetToken,
+        new_password: newPassword
+      }),
+      skipAuth: true,
+    });
+
+    return response;
+
+  } catch (error) {
+    console.error('❌ Error en resetPassword:', error);
+    return {
+      success: false,
+      message: error.message || 'Error al restablecer la contraseña'
+    };
+  }
+}
+
+/**
+ * Reenviar código de verificación
+ */
+async resendCode(email) {
+  try {
+    if (!email || !email.trim()) {
+      throw new Error('El correo electrónico es requerido');
+    }
+
+    const response = await this.makeRequest(API_CONFIG.endpoints.resendCode || '/resend-code', {
+      method: 'POST',
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      skipAuth: true,
+    });
+
+    return response;
+
+  } catch (error) {
+    console.error('❌ Error en resendCode:', error);
+    return {
+      success: false,
+      message: error.message || 'Error al reenviar el código'
+    };
+  }
+}
+
   /**
    * Cerrar sesión
    */
   async logout() {
     try {
-      // Intentar logout en el servidor
       if (this.token) {
         await this.makeRequest(API_CONFIG.endpoints.logout, {
           method: 'POST',
         });
       }
 
-      // Limpiar datos locales
       this.clearLocalData();
 
       console.log('✅ Logout exitoso');
@@ -220,7 +337,6 @@ class AuthService {
 
     } catch (error) {
       console.error('❌ Error en logout:', error);
-      // Aún así limpiar datos locales
       this.clearLocalData();
       return { success: true, message: 'Sesión cerrada (con errores)' };
     }
@@ -238,12 +354,10 @@ class AuthService {
       const response = await this.makeRequest(API_CONFIG.endpoints.verifySession);
       
       if (response && !response.detail) {
-        // Actualizar datos del usuario
         this.user = response;
         sessionStorage.setItem('user_data', JSON.stringify(this.user));
         return { success: true, user: this.user };
       } else {
-        // Token inválido, limpiar datos
         this.clearLocalData();
         return { success: false, message: 'Sesión expirada' };
       }
@@ -252,81 +366,6 @@ class AuthService {
       console.error('❌ Error verificando sesión:', error);
       this.clearLocalData();
       return { success: false, message: 'Error verificando sesión' };
-    }
-  }
-
-  /**
-   * Obtener perfil del usuario
-   */
-  async getProfile() {
-    try {
-      const response = await this.makeRequest(API_CONFIG.endpoints.profile);
-      
-      if (response && !response.detail) {
-        this.user = response;
-        sessionStorage.setItem('user_data', JSON.stringify(this.user));
-        return { success: true, data: response };
-      }
-
-      return { success: false, message: 'Error obteniendo perfil' };
-
-    } catch (error) {
-      console.error('❌ Error obteniendo perfil:', error);
-      return { success: false, message: error.message };
-    }
-  }
-
-  /**
-   * Cambiar contraseña
-   */
-  async changePassword(passwords) {
-    try {
-      if (!passwords.currentPassword || !passwords.newPassword) {
-        throw new Error('Contraseña actual y nueva son requeridas');
-      }
-
-      if (passwords.newPassword.length < 8) {
-        throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
-      }
-
-      if (passwords.newPassword !== passwords.confirmPassword) {
-        throw new Error('Las contraseñas no coinciden');
-      }
-
-      const response = await this.makeRequest(API_CONFIG.endpoints.changePassword, {
-        method: 'PUT',
-        body: JSON.stringify({
-          current_password: passwords.currentPassword,
-          new_password: passwords.newPassword,
-        }),
-      });
-
-      return response;
-
-    } catch (error) {
-      console.error('❌ Error cambiando contraseña:', error);
-      return { success: false, message: error.message };
-    }
-  }
-
-  /**
-   * Verificar estado del servidor
-   */
-  async healthCheck() {
-    try {
-      const response = await this.makeRequest(API_CONFIG.endpoints.healthCheck, {
-        skipAuth: true,
-      });
-
-      return response;
-
-    } catch (error) {
-      console.error('❌ Error en health check:', error);
-      return {
-        success: false,
-        message: 'Servidor no disponible',
-        error: error.message
-      };
     }
   }
 
@@ -346,7 +385,6 @@ class AuthService {
       throw new Error('La contraseña debe tener al menos 4 caracteres');
     }
 
-    // Validar caracteres permitidos en username
     const usernameRegex = /^[a-zA-Z0-9._@-]+$/;
     if (!usernameRegex.test(credentials.username)) {
       throw new Error('El usuario contiene caracteres no válidos');
@@ -363,41 +401,9 @@ class AuthService {
     sessionStorage.removeItem('user_data');
     sessionStorage.removeItem('login_time');
     
-    // Limpiar timers
     if (this.autoLogoutTimer) {
       clearTimeout(this.autoLogoutTimer);
     }
-  }
-
-  /**
-   * Configurar auto-logout después de inactividad
-   */
-  setupAutoLogout() {
-    const INACTIVITY_TIME = 30 * 60 * 1000; // 30 minutos
-
-    // Limpiar timer anterior
-    if (this.autoLogoutTimer) {
-      clearTimeout(this.autoLogoutTimer);
-    }
-
-    // Configurar nuevo timer
-    this.autoLogoutTimer = setTimeout(() => {
-      console.log('⏰ Auto-logout por inactividad');
-      this.logout();
-      window.location.reload();
-    }, INACTIVITY_TIME);
-
-    // Resetear timer en actividad del usuario
-    const resetTimer = () => {
-      clearTimeout(this.autoLogoutTimer);
-      this.setupAutoLogout();
-    };
-
-    // Eventos que resetean el timer
-    document.addEventListener('mousedown', resetTimer);
-    document.addEventListener('keypress', resetTimer);
-    document.addEventListener('scroll', resetTimer);
-    document.addEventListener('touchstart', resetTimer);
   }
 
   /**
@@ -427,31 +433,10 @@ class AuthService {
   hasRole(role) {
     return this.user && this.user.rol === role;
   }
-
-  /**
-   * Obtener tiempo de sesión
-   */
-  getSessionTime() {
-    const loginTime = sessionStorage.getItem('login_time');
-    if (!loginTime) return null;
-
-    const now = new Date();
-    const login = new Date(loginTime);
-    const diffMinutes = Math.floor((now - login) / (1000 * 60));
-
-    return {
-      loginTime: login,
-      currentTime: now,
-      sessionMinutes: diffMinutes
-    };
-  }
 }
 
 // Crear instancia singleton
 const authService = new AuthService();
 
-// Exportar para uso en React
 export default authService;
-
-// También exportar la clase para casos específicos
 export { AuthService };

@@ -2,6 +2,8 @@
 // src/pages/Login.js 
 // Este componente maneja el inicio de sesión del usuario, validaciones y redirección según el perfil.
 import React, { useState, useEffect } from 'react'; 
+import { Link } from 'react-router-dom';
+
 import { User, Lock, Eye, EyeOff, Droplets, AlertCircle } from 'lucide-react';
 import authService from '../services/authServices'; // Servicio de autenticación
 import { redirectByProfile } from '../utils/auth'; // Función para redirigir según el perfil del usuario
@@ -223,9 +225,9 @@ const Login = () => { // Estado del componente, inicializa los datos del formula
 
             {/* Enlaces adicionales */}
             <div className="form-links">
-              <a href="/forgot-password" className="forgot-link">
+              <Link to="/forgot-password" className="forgot-link">
                 ¿Olvidaste tu contraseña?
-              </a>
+              </Link>
             </div>
           </div>
         </div>

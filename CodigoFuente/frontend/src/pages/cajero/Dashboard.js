@@ -1,5 +1,5 @@
-// src/pages/lector/Dashboard.js
-// Panel de Lector - Dashboard.js
+// src/pages/cajero/Dashboard.js
+// Panel de Cajero - Dashboard.js
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,7 +11,7 @@ import UserProfile from '../../components/UserProfile';
 
 // Importar iconos
 import { 
-  Activity, 
+  DollarSign, 
   Search,
   Droplets,
   BarChart3,
@@ -28,12 +28,14 @@ import {
   MapPin,
   Shield,
   CheckCircle,
-  Clock,
   FileText,
-  MapPinned
+  CreditCard,
+  Receipt,
+  Clock,
+  Users
 } from 'lucide-react';
 
-const LectorDashboard = () => {
+const CajeroDashboard = () => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('overview');
   const [notifications] = useState([]);
@@ -46,7 +48,6 @@ const LectorDashboard = () => {
     const currentUser = authService.getCurrentUser();
     
     if (!currentUser || !authService.isAuthenticated()) {
-      console.log('Usuario no autenticado, redirigiendo al login');
       navigate('/login');
       return;
     }
@@ -70,7 +71,6 @@ const LectorDashboard = () => {
         await authService.logout();
         navigate('/login');
       } catch (error) {
-        console.error('Error en logout:', error);
         navigate('/login');
       }
     }
@@ -110,7 +110,6 @@ const LectorDashboard = () => {
       setEditingProfile(false);
       alert('Perfil actualizado correctamente');
     } catch (error) {
-      console.error('Error al actualizar perfil:', error);
       alert('Error al actualizar el perfil');
     }
   };
@@ -130,7 +129,7 @@ const LectorDashboard = () => {
   const getUserInitials = (nombres, apellidos) => {
     const firstInitial = nombres ? nombres.charAt(0).toUpperCase() : '';
     const lastInitial = apellidos ? apellidos.charAt(0).toUpperCase() : '';
-    return firstInitial + lastInitial || 'L';
+    return firstInitial + lastInitial || 'C';
   };
 
   if (!user) {
@@ -147,23 +146,24 @@ const LectorDashboard = () => {
   const sidebarItems = [
     { id: 'overview', label: 'Panel General', icon: BarChart3 },
     { id: 'profile', label: 'Mi Perfil', icon: User },
-    { id: 'readings', label: 'Registrar Lecturas', icon: Activity },
-    { id: 'routes', label: 'Rutas Asignadas', icon: MapPinned },
-    { id: 'history', label: 'Historial', icon: Calendar },
-    { id: 'reports', label: 'Mis Reportes', icon: FileText }
+    { id: 'payments', label: 'Registrar Pagos', icon: DollarSign },
+    { id: 'invoices', label: 'Facturas', icon: FileText },
+    { id: 'receipts', label: 'Comprobantes', icon: Receipt },
+    { id: 'customers', label: 'Clientes', icon: Users },
+    { id: 'reports', label: 'Reportes de Caja', icon: BarChart3 }
   ];
 
   const stats = [
     { 
-      title: 'Lecturas Hoy', 
-      value: '0', 
+      title: 'Cobros Hoy', 
+      value: '$0', 
       change: '0%', 
       color: 'blue',
-      icon: Activity,
+      icon: DollarSign,
       trend: 'up'
     },
     { 
-      title: 'Lecturas Mes', 
+      title: 'Transacciones', 
       value: '0', 
       change: '0%', 
       color: 'green',
@@ -179,11 +179,11 @@ const LectorDashboard = () => {
       trend: 'down'
     },
     { 
-      title: 'Rutas Activas', 
+      title: 'Facturas Mes', 
       value: '0', 
       change: '0%', 
       color: 'emerald',
-      icon: MapPinned,
+      icon: FileText,
       trend: 'up'
     }
   ];
@@ -224,7 +224,7 @@ const LectorDashboard = () => {
             </div>
             <div className="logo-text">
               <h2>JAAP Sanjapamba</h2>
-              <p>Panel de Lector</p>
+              <p>Panel de Cajero</p>
             </div>
           </div>
         </div>
@@ -252,7 +252,7 @@ const LectorDashboard = () => {
         <header className="header">
           <div className="header-content">
             <div className="header-title">
-              <h1>Panel de Lector</h1>
+              <h1>Panel de Cajero</h1>
               <p>Bienvenido, {user.nombres || `${user.nombres} ${user.apellidos}`}</p>
             </div>
 
@@ -262,7 +262,7 @@ const LectorDashboard = () => {
                 <Search className="search-icon" />
                 <input
                   type="text"
-                  placeholder="Buscar lecturas, clientes..."
+                  placeholder="Buscar clientes, facturas..."
                   className="search-input"
                 />
               </div>
@@ -313,34 +313,34 @@ const LectorDashboard = () => {
                     <h3 className="card-title">Acciones Rápidas</h3>
                   </div>
                   <div className="quick-actions-grid">
-                    <button className="quick-action-btn" onClick={() => setActiveSection('readings')}>
-                      <Activity className="quick-action-icon" />
-                      <span className="quick-action-text">Registrar Lectura</span>
+                    <button className="quick-action-btn" onClick={() => setActiveSection('payments')}>
+                      <DollarSign className="quick-action-icon" />
+                      <span className="quick-action-text">Registrar Pago</span>
                     </button>
-                    <button className="quick-action-btn" onClick={() => setActiveSection('routes')}>
-                      <MapPinned className="quick-action-icon" />
-                      <span className="quick-action-text">Ver Rutas</span>
+                    <button className="quick-action-btn" onClick={() => setActiveSection('invoices')}>
+                      <FileText className="quick-action-icon" />
+                      <span className="quick-action-text">Ver Facturas</span>
                     </button>
-                    <button className="quick-action-btn" onClick={() => setActiveSection('history')}>
-                      <Calendar className="quick-action-icon" />
-                      <span className="quick-action-text">Ver Historial</span>
+                    <button className="quick-action-btn" onClick={() => setActiveSection('receipts')}>
+                      <Receipt className="quick-action-icon" />
+                      <span className="quick-action-text">Comprobantes</span>
                     </button>
                     <button className="quick-action-btn" onClick={() => setActiveSection('reports')}>
-                      <FileText className="quick-action-icon" />
-                      <span className="quick-action-text">Mis Reportes</span>
+                      <BarChart3 className="quick-action-icon" />
+                      <span className="quick-action-text">Reportes</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Información del Día */}
+                {/* Resumen de Caja */}
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="card-title">Resumen del Día</h3>
+                    <h3 className="card-title">Resumen de Caja del Día</h3>
                   </div>
                   <div className="activity-list">
                     <div className="empty-state">
-                      <Clock className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>No hay lecturas registradas hoy</p>
+                      <CreditCard className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                      <p>No hay transacciones registradas hoy</p>
                     </div>
                   </div>
                 </div>
@@ -494,7 +494,7 @@ const LectorDashboard = () => {
                         </label>
                         <div className="form-value">
                           <span className={`role-badge ${profileData.rol?.toLowerCase()}`}>
-                            {profileData.rol || 'Lector'}
+                            {profileData.rol || 'Cajero'}
                           </span>
                         </div>
                       </div>
@@ -519,35 +519,43 @@ const LectorDashboard = () => {
           )}
 
           {/* Otras secciones */}
-          {activeSection === 'readings' && (
+          {activeSection === 'payments' && (
             <div className="section-placeholder">
-              <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Registrar Lecturas</h2>
-              <p>Módulo para registrar las lecturas de medidores de agua.</p>
+              <DollarSign className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h2>Registrar Pagos</h2>
+              <p>Módulo para registrar y procesar pagos de clientes.</p>
             </div>
           )}
 
-          {activeSection === 'routes' && (
+          {activeSection === 'invoices' && (
             <div className="section-placeholder">
-              <MapPinned className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Rutas Asignadas</h2>
-              <p>Consulta las rutas que tienes asignadas para realizar lecturas.</p>
+              <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h2>Gestión de Facturas</h2>
+              <p>Consulta y gestiona las facturas del sistema.</p>
             </div>
           )}
 
-          {activeSection === 'history' && (
+          {activeSection === 'receipts' && (
             <div className="section-placeholder">
-              <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Historial de Lecturas</h2>
-              <p>Revisa el historial completo de lecturas realizadas.</p>
+              <Receipt className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h2>Comprobantes de Pago</h2>
+              <p>Genera y consulta comprobantes de pago.</p>
+            </div>
+          )}
+
+          {activeSection === 'customers' && (
+            <div className="section-placeholder">
+              <Users className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h2>Gestión de Clientes</h2>
+              <p>Consulta información de clientes y su historial de pagos.</p>
             </div>
           )}
 
           {activeSection === 'reports' && (
             <div className="section-placeholder">
-              <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Mis Reportes</h2>
-              <p>Genera y consulta reportes de tu actividad como lector.</p>
+              <BarChart3 className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h2>Reportes de Caja</h2>
+              <p>Genera reportes de cierre de caja y movimientos.</p>
             </div>
           )}
         </main>
@@ -556,4 +564,4 @@ const LectorDashboard = () => {
   );
 };
 
-export default LectorDashboard;
+export default CajeroDashboard;

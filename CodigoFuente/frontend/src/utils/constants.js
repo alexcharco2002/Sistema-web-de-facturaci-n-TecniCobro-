@@ -1,13 +1,13 @@
 export const USER_PROFILES = {
   ADMIN: 'administrador',
-  TESORERO: 'tesorero',
+  CAJERO: 'CAJERO',
   LECTOR: 'lector',
   USUARIO: 'usuario'
 };
 
 export const PROFILE_NAMES = {
   [USER_PROFILES.ADMIN]: 'administrador',
-  [USER_PROFILES.TESORERO]: 'Tesorero',
+  [USER_PROFILES.CAJERO]: 'CAJERO',
   [USER_PROFILES.LECTOR]: 'Lector',
   [USER_PROFILES.USUARIO]: 'Usuario'
 };

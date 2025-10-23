@@ -1,14 +1,28 @@
 # routes/auth.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from schemas.user import UserLogin
 from models.user import UsuarioSistema
 from db.session import SessionLocal
 from security.jwt import create_access_token, verify_token
 from security.password import verify_password
 import base64
+from secrets import token_urlsafe
+from security.password import hash_password
+import secrets
+import string
+from utils.email import email_service
+from security.password import hash_password
 
 router = APIRouter(tags=["auth"])
+
+# ========================================
+# CONFIGURACIÓN DE BLOQUEO
+# ========================================
+MAX_INTENTOS_TEMPORALES = 5      # Intentos antes de bloqueo temporal
+TIEMPO_BLOQUEO_TEMPORAL = 15     # Minutos de bloqueo temporal
+MAX_INTENTOS_PERMANENTES = 10    # Intentos totales antes de bloqueo permanente
 
 def get_db():
     db = SessionLocal()
@@ -29,68 +43,197 @@ def process_user_photo(foto_bytes):
     return None
 
 # ========================================
-# LOGIN - ACTUALIZADO CON BCRYPT
+# FUNCIONES DE CONTROL DE BLOQUEO
+# ========================================
+def verificar_estado_bloqueo(user: UsuarioSistema) -> dict:
+    """
+    Verifica el estado de bloqueo del usuario
+    Retorna: dict con 'bloqueado': bool y 'mensaje': str
+    """
+    ahora = datetime.now()
+    
+    # Verificar bloqueo permanente
+    if hasattr(user, 'bloqueado_permanente') and user.bloqueado_permanente:
+        return {
+            "bloqueado": True,
+            "tipo": "permanente",
+            "mensaje": "Tu cuenta ha sido bloqueada permanentemente por exceso de intentos fallidos. Por favor, contacta al administrador."
+        }
+    
+    # Verificar bloqueo temporal activo
+    if hasattr(user, 'bloqueado_hasta') and user.bloqueado_hasta and user.bloqueado_hasta > ahora:
+        tiempo_restante = user.bloqueado_hasta - ahora
+        minutos_restantes = int(tiempo_restante.total_seconds() / 60)
+        return {
+            "bloqueado": True,
+            "tipo": "temporal",
+            "mensaje": f"Cuenta bloqueada temporalmente. Intenta nuevamente en {minutos_restantes} minutos.",
+            "bloqueado_hasta": user.bloqueado_hasta.isoformat()
+        }
+    
+    # Si había bloqueo temporal pero ya expiró, resetear
+    if hasattr(user, 'bloqueado_hasta') and user.bloqueado_hasta and user.bloqueado_hasta <= ahora:
+        user.bloqueado_hasta = None
+    
+    return {"bloqueado": False, "tipo": None, "mensaje": None}
+
+def registrar_intento_fallido(db: Session, user: UsuarioSistema) -> dict:
+    """
+    Registra un intento fallido y aplica bloqueos según corresponda
+    Retorna: dict con información del bloqueo aplicado
+    """
+    # Inicializar campo si no existe
+    if not hasattr(user, 'intentos_fallidos') or user.intentos_fallidos is None:
+        user.intentos_fallidos = 0
+    
+    user.intentos_fallidos += 1
+    intentos_actuales = user.intentos_fallidos
+    
+    # Bloqueo permanente
+    if intentos_actuales >= MAX_INTENTOS_PERMANENTES:
+        if hasattr(user, 'bloqueado_permanente'):
+            user.bloqueado_permanente = True
+        if hasattr(user, 'bloqueado_hasta'):
+            user.bloqueado_hasta = None
+        db.commit()
+        return {
+            "bloqueado": True,
+            "tipo": "permanente",
+            "intentos": intentos_actuales,
+            "mensaje": "Tu cuenta ha sido bloqueada permanentemente. Contacta al administrador."
+        }
+    
+    # Bloqueo temporal cada 5 intentos
+    if intentos_actuales % MAX_INTENTOS_TEMPORALES == 0:
+        if hasattr(user, 'bloqueado_hasta'):
+            user.bloqueado_hasta = datetime.now() + timedelta(minutes=TIEMPO_BLOQUEO_TEMPORAL)
+        db.commit()
+        return {
+            "bloqueado": True,
+            "tipo": "temporal",
+            "intentos": intentos_actuales,
+            "mensaje": f"Cuenta bloqueada temporalmente por {TIEMPO_BLOQUEO_TEMPORAL} minutos debido a múltiples intentos fallidos.",
+            "bloqueado_hasta": user.bloqueado_hasta.isoformat() if hasattr(user, 'bloqueado_hasta') and user.bloqueado_hasta else None,
+            "intentos_restantes": MAX_INTENTOS_PERMANENTES - intentos_actuales
+        }
+    
+    db.commit()
+    intentos_restantes_temporal = MAX_INTENTOS_TEMPORALES - (intentos_actuales % MAX_INTENTOS_TEMPORALES)
+    intentos_restantes_permanente = MAX_INTENTOS_PERMANENTES - intentos_actuales
+    
+    return {
+        "bloqueado": False,
+        "tipo": "advertencia",
+        "intentos": intentos_actuales,
+        "mensaje": f"Credenciales incorrectas. Te quedan {intentos_restantes_temporal} intentos antes del bloqueo temporal. Total de intentos: {intentos_actuales}/{MAX_INTENTOS_PERMANENTES}",
+        "intentos_restantes_temporal": intentos_restantes_temporal,
+        "intentos_restantes_permanente": intentos_restantes_permanente
+    }
+
+def resetear_intentos_fallidos(db: Session, user: UsuarioSistema):
+    """Resetea los intentos fallidos tras un login exitoso"""
+    if hasattr(user, 'intentos_fallidos'):
+        user.intentos_fallidos = 0
+    if hasattr(user, 'bloqueado_hasta'):
+        user.bloqueado_hasta = None
+    if hasattr(user, 'ultimo_acceso'):
+        user.ultimo_acceso = datetime.now()
+    db.commit()
+
+# ========================================
+# LOGIN - CON CONTROL DE BLOQUEOS
 # ========================================
 @router.post("/login", response_model=dict)
 def login(user: UserLogin, db: Session = Depends(get_db)):
     """
     Inicia sesión con usuario y contraseña
-    Ahora verifica contraseñas cifradas con bcrypt
+    Incluye control de intentos fallidos y bloqueos
     """
-    # Buscar usuario por nombre de usuario
-    db_user = db.query(UsuarioSistema).filter(
-        UsuarioSistema.usuario == user.username.strip().lower()
-    ).first()
+    try:
+        # Buscar usuario por nombre de usuario
+        db_user = db.query(UsuarioSistema).filter(
+            UsuarioSistema.usuario == user.username.strip().lower()
+        ).first()
 
-    if not db_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales inválidas, Usuario no registrado"
-        )
-    
-    # Verificar contraseña usando bcrypt
-    if not verify_password(user.password.strip(), db_user.clave):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales inválidas, Usuario no registrado"
-        )
-    
-    # Verificar si el usuario está activo (si el campo existe)
-    if hasattr(db_user, 'activo') and not db_user.activo:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuario inactivo. Contacte al administrador"
-        )
+        if not db_user:
+            return {
+                "success": False,
+                "message": "Credenciales inválidas, Usuario no registrado"
+            }
+        
+        # Verificar si el usuario está activo
+        if hasattr(db_user, 'activo') and not db_user.activo:
+            return {
+                "success": False,
+                "message": "Usuario inactivo. Contacte al administrador"
+            }
+        
+        # Verificar estado de bloqueo
+        estado_bloqueo = verificar_estado_bloqueo(db_user)
+        if estado_bloqueo["bloqueado"]:
+            return {
+                "success": False,
+                "bloqueado": True,
+                "tipo_bloqueo": estado_bloqueo["tipo"],
+                "message": estado_bloqueo["mensaje"],
+                "bloqueado_hasta": estado_bloqueo.get("bloqueado_hasta")
+            }
+        
+        # Verificar contraseña usando bcrypt
+        if not verify_password(user.password.strip(), db_user.clave):
+            # Registrar intento fallido
+            resultado = registrar_intento_fallido(db, db_user)
+            
+            return {
+                "success": False,
+                "bloqueado": resultado.get("bloqueado", False),
+                "tipo_bloqueo": resultado.get("tipo"),
+                "message": resultado["mensaje"],
+                "intentos_fallidos": resultado["intentos"],
+                "intentos_restantes_temporal": resultado.get("intentos_restantes_temporal"),
+                "intentos_restantes_permanente": resultado.get("intentos_restantes_permanente"),
+                "bloqueado_hasta": resultado.get("bloqueado_hasta")
+            }
+        
+        # Login exitoso - resetear intentos fallidos
+        resetear_intentos_fallidos(db, db_user)
 
-    # Procesar la foto del usuario
-    foto_url = process_user_photo(db_user.foto) if hasattr(db_user, 'foto') and db_user.foto else None
+        # Procesar la foto del usuario
+        foto_url = process_user_photo(db_user.foto) if hasattr(db_user, 'foto') and db_user.foto else None
 
-    # Crear el token de acceso
-    token_data = {
-        "sub": db_user.usuario,
-        "rol": db_user.rol,
-        "nombres": db_user.nombres
-    }
+        # Crear el token de acceso
+        token_data = {
+            "sub": db_user.usuario,
+            "rol": db_user.rol,
+            "nombres": db_user.nombres
+        }
 
-    access_token = create_access_token(data=token_data)
+        access_token = create_access_token(data=token_data)
 
-    return {
-        "success": True,
-        "message": "Inicio de sesión exitoso",
-        "data": {
-            "token": access_token,
-            "user": {
-                "cod_usuario_sistema": db_user.cod_usuario_sistema,
-                "usuario": db_user.usuario,
-                "nombres": db_user.nombres,
-                "apellidos": db_user.apellidos,
-                "nombre_completo": f"{db_user.nombres} {db_user.apellidos}",
-                "rol": db_user.rol,
-                "email": db_user.email,
-                "foto": foto_url
+        return {
+            "success": True,
+            "message": "Inicio de sesión exitoso",
+            "data": {
+                "token": access_token,
+                "user": {
+                    "cod_usuario_sistema": db_user.cod_usuario_sistema,
+                    "usuario": db_user.usuario,
+                    "nombres": db_user.nombres,
+                    "apellidos": db_user.apellidos,
+                    "nombre_completo": f"{db_user.nombres} {db_user.apellidos}",
+                    "rol": db_user.rol,
+                    "email": db_user.email,
+                    "foto": foto_url
+                }
             }
         }
-    }
+    
+    except Exception as e:
+        print(f"❌ Error en login: {e}")
+        return {
+            "success": False,
+            "message": "Error interno del servidor"
+        }
 
 # ========================================
 # VERIFICAR SESIÓN
@@ -113,6 +256,14 @@ def verify_session(payload: dict = Depends(verify_token), db: Session = Depends(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario inactivo"
+        )
+    
+    # Verificar bloqueo
+    estado_bloqueo = verificar_estado_bloqueo(db_user)
+    if estado_bloqueo["bloqueado"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=estado_bloqueo["mensaje"]
         )
     
     foto_url = process_user_photo(db_user.foto) if hasattr(db_user, 'foto') and db_user.foto else None
@@ -178,6 +329,145 @@ def logout():
     }
 
 # ========================================
+# DESBLOQUEAR USUARIO (ADMINISTRADOR)
+# ========================================
+@router.post("/admin/unlock-user/{user_id}")
+def unlock_user(
+    user_id: int,
+    payload: dict = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """Permite al administrador desbloquear un usuario"""
+    # Solo administradores
+    if payload.get("rol") != "administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para desbloquear usuarios"
+        )
+    
+    user = db.query(UsuarioSistema).filter(
+        UsuarioSistema.cod_usuario_sistema == user_id
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado"
+        )
+    
+    # Guardar estado anterior
+    was_permanently_blocked = getattr(user, 'bloqueado_permanente', False)
+    was_temporarily_blocked = getattr(user, 'bloqueado_hasta', None) is not None
+    previous_attempts = getattr(user, 'intentos_fallidos', 0)
+    
+    # Resetear bloqueos
+    if hasattr(user, 'intentos_fallidos'):
+        user.intentos_fallidos = 0
+    if hasattr(user, 'bloqueado_hasta'):
+        user.bloqueado_hasta = None
+    if hasattr(user, 'bloqueado_permanente'):
+        user.bloqueado_permanente = False
+    
+    db.commit()
+    
+    # Mensaje personalizado
+    if was_permanently_blocked:
+        message = f"Usuario '{user.usuario}' desbloqueado exitosamente (bloqueo permanente removido)"
+    elif was_temporarily_blocked:
+        message = f"Usuario '{user.usuario}' desbloqueado exitosamente (bloqueo temporal removido)"
+    else:
+        message = f"Intentos fallidos reseteados para '{user.usuario}'"
+    
+    return {
+        "success": True,
+        "message": message,
+        "data": {
+            "usuario": user.usuario,
+            "intentos_previos": previous_attempts,
+            "bloqueado_permanente_previo": was_permanently_blocked,
+            "bloqueado_temporal_previo": was_temporarily_blocked
+        }
+    }
+
+# ========================================
+# OBTENER USUARIOS BLOQUEADOS (ADMIN)
+# ========================================
+@router.get("/admin/blocked-users")
+def get_blocked_users(
+    payload: dict = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """Lista todos los usuarios bloqueados - Solo admin"""
+    if payload.get("rol") != "administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver usuarios bloqueados"
+        )
+    
+    ahora = datetime.now()
+    
+    # Construir query base
+    query = db.query(UsuarioSistema)
+    
+    # Usuarios con bloqueo permanente
+    permanently_blocked = []
+    if hasattr(UsuarioSistema, 'bloqueado_permanente'):
+        permanently_blocked = query.filter(
+            UsuarioSistema.bloqueado_permanente == True
+        ).all()
+    
+    # Usuarios con bloqueo temporal activo
+    temporarily_blocked = []
+    if hasattr(UsuarioSistema, 'bloqueado_hasta'):
+        temporarily_blocked = query.filter(
+            UsuarioSistema.bloqueado_hasta > ahora
+        ).all()
+        if hasattr(UsuarioSistema, 'bloqueado_permanente'):
+            temporarily_blocked = [u for u in temporarily_blocked if not u.bloqueado_permanente]
+    
+    # Usuarios con intentos fallidos pero no bloqueados
+    users_with_attempts = []
+    if hasattr(UsuarioSistema, 'intentos_fallidos'):
+        users_with_attempts = query.filter(
+            UsuarioSistema.intentos_fallidos > 0
+        ).all()
+        
+        # Filtrar los que ya están bloqueados
+        users_with_attempts = [
+            u for u in users_with_attempts
+            if not getattr(u, 'bloqueado_permanente', False)
+            and (not hasattr(u, 'bloqueado_hasta') or not u.bloqueado_hasta or u.bloqueado_hasta <= ahora)
+        ]
+    
+    def format_user_lock_info(user):
+        tiempo_restante = None
+        if hasattr(user, 'bloqueado_hasta') and user.bloqueado_hasta and user.bloqueado_hasta > ahora:
+            tiempo_restante = int((user.bloqueado_hasta - ahora).total_seconds() / 60)
+        
+        return {
+            "id": user.cod_usuario_sistema,
+            "usuario": user.usuario,
+            "nombre_completo": f"{user.nombres} {user.apellidos}",
+            "email": user.email,
+            "intentos_fallidos": getattr(user, 'intentos_fallidos', 0),
+            "bloqueado_permanente": getattr(user, 'bloqueado_permanente', False),
+            "bloqueado_hasta": user.bloqueado_hasta.isoformat() if hasattr(user, 'bloqueado_hasta') and user.bloqueado_hasta else None,
+            "tiempo_restante_minutos": tiempo_restante
+        }
+    
+    return {
+        "success": True,
+        "data": {
+            "permanently_blocked": [format_user_lock_info(u) for u in permanently_blocked],
+            "temporarily_blocked": [format_user_lock_info(u) for u in temporarily_blocked],
+            "users_with_attempts": [format_user_lock_info(u) for u in users_with_attempts],
+            "total_permanently_blocked": len(permanently_blocked),
+            "total_temporarily_blocked": len(temporarily_blocked),
+            "total_with_attempts": len(users_with_attempts)
+        }
+    }
+
+# ========================================
 # HEALTH CHECK
 # ========================================
 @router.get("/health")
@@ -188,3 +478,310 @@ def health_check():
         "status": "healthy",
         "message": "Servidor API funcionando correctamente"
     }
+
+# Diccionario temporal para almacenar códigos de verificación
+# En producción, considera usar Redis o similar
+verification_codes = {}
+
+# Configuración
+VERIFICATION_CODE_LENGTH = 6
+VERIFICATION_CODE_EXPIRE_MINUTES = 15
+
+def generate_verification_code() -> str:
+    """Genera un código de verificación numérico de 6 dígitos"""
+    return ''.join(secrets.choice(string.digits) for _ in range(VERIFICATION_CODE_LENGTH))
+
+def store_verification_code(email: str, code: str):
+    """Almacena el código con su tiempo de expiración"""
+    expiration = datetime.now() + timedelta(minutes=VERIFICATION_CODE_EXPIRE_MINUTES)
+    verification_codes[email] = {
+        "code": code,
+        "expires_at": expiration,
+        "attempts": 0
+    }
+
+def verify_code(email: str, code: str) -> dict:
+    """
+    Verifica si el código es válido
+    Retorna: {"valid": bool, "message": str}
+    """
+    if email not in verification_codes:
+        return {"valid": False, "message": "No se encontró un código para este correo"}
+    
+    stored_data = verification_codes[email]
+    
+    # Verificar expiración
+    if datetime.now() > stored_data["expires_at"]:
+        del verification_codes[email]
+        return {"valid": False, "message": "El código ha expirado. Solicita uno nuevo"}
+    
+    # Verificar intentos
+    if stored_data["attempts"] >= 3:
+        del verification_codes[email]
+        return {"valid": False, "message": "Demasiados intentos fallidos. Solicita un nuevo código"}
+    
+    # Verificar código
+    if stored_data["code"] != code:
+        stored_data["attempts"] += 1
+        intentos_restantes = 3 - stored_data["attempts"]
+        return {
+            "valid": False,
+            "message": f"Código incorrecto. Te quedan {intentos_restantes} intentos"
+        }
+    
+    return {"valid": True, "message": "Código verificado correctamente"}
+
+# ========================================
+# SOLICITAR CÓDIGO DE RECUPERACIÓN
+# ========================================
+@router.post("/forgot-password")
+def forgot_password(request: dict, db: Session = Depends(get_db)):
+    """
+    Envía un código de verificación al correo del usuario
+    Request body: {"email": "usuario@ejemplo.com"}
+    """
+    try:
+        email = request.get("email", "").strip().lower()
+        
+        if not email:
+            return {
+                "success": False,
+                "message": "El correo electrónico es requerido"
+            }
+        
+        # Buscar usuario por email
+        user = db.query(UsuarioSistema).filter(
+            UsuarioSistema.email == email
+        ).first()
+        
+        if not user:
+            return {
+                "success": False,
+                "message": "El correo ingresado no se encuentra registrado en el sistema.",
+                "email_sent": False
+            }
+        
+        # Verificar que el usuario esté activo
+        if hasattr(user, 'activo') and not user.activo:
+            return {
+                "success": False,
+                "message": "Esta cuenta está inactiva. Contacta al administrador"
+            }
+        
+        # Generar código de verificación
+        verification_code = generate_verification_code()
+        
+        # Almacenar código
+        store_verification_code(email, verification_code)
+        
+        # Enviar email
+        email_sent = email_service.send_verification_code(
+            to_email=email,
+            code=verification_code,
+            username=user.usuario
+        )
+        
+        if not email_sent:
+            return {
+                "success": False,
+                "message": "Error al enviar el correo. Intenta nuevamente"
+            }
+        
+        return {
+            "success": True,
+            "message": "Se ha enviado un código de verificación a tu correo",
+            "email_sent": True,
+            "expires_in_minutes": VERIFICATION_CODE_EXPIRE_MINUTES
+        }
+    
+    except Exception as e:
+        print(f"❌ Error en forgot_password: {e}")
+        return {
+            "success": False,
+            "message": "Error interno del servidor"
+        }
+
+# ========================================
+# VERIFICAR CÓDIGO
+# ========================================
+@router.post("/verify-code")
+def verify_recovery_code(request: dict):
+    """
+    Verifica el código de recuperación
+    Request body: {"email": "usuario@ejemplo.com", "code": "123456"}
+    """
+    try:
+        email = request.get("email", "").strip().lower()
+        code = request.get("code", "").strip()
+        
+        if not email or not code:
+            return {
+                "success": False,
+                "message": "Email y código son requeridos"
+            }
+        
+        # Verificar código
+        result = verify_code(email, code)
+        
+        if not result["valid"]:
+            return {
+                "success": False,
+                "message": result["message"]
+            }
+        
+        # Generar token temporal para cambiar contraseña
+        # Este token solo sirve para el endpoint de reset-password
+        reset_token = secrets.token_urlsafe(32)
+        
+        # Almacenar token temporal (expira en 10 minutos)
+        verification_codes[f"reset_{email}"] = {
+            "token": reset_token,
+            "expires_at": datetime.now() + timedelta(minutes=10)
+        }
+        
+        return {
+            "success": True,
+            "message": "Código verificado correctamente",
+            "reset_token": reset_token
+        }
+    
+    except Exception as e:
+        print(f"❌ Error en verify_code: {e}")
+        return {
+            "success": False,
+            "message": "Error interno del servidor"
+        }
+
+# ========================================
+# RESTABLECER CONTRASEÑA
+# ========================================
+@router.post("/reset-password")
+def reset_password(request: dict, db: Session = Depends(get_db)):
+    """
+    Restablece la contraseña del usuario
+    Request body: {
+        "email": "usuario@ejemplo.com",
+        "reset_token": "token_temporal",
+        "new_password": "nueva_contraseña"
+    }
+    """
+    try:
+        email = request.get("email", "").strip().lower()
+        reset_token = request.get("reset_token", "").strip()
+        new_password = request.get("new_password", "").strip()
+        
+        if not all([email, reset_token, new_password]):
+            return {
+                "success": False,
+                "message": "Todos los campos son requeridos"
+            }
+        
+        # Validar longitud de contraseña
+        if len(new_password) < 8:
+            return {
+                "success": False,
+                "message": "La contraseña debe tener al menos 8 caracteres"
+            }
+        
+        # Verificar token de reset
+        reset_key = f"reset_{email}"
+        if reset_key not in verification_codes:
+            return {
+                "success": False,
+                "message": "Token de recuperación inválido o expirado"
+            }
+        
+        stored_data = verification_codes[reset_key]
+        
+        # Verificar expiración
+        if datetime.now() > stored_data["expires_at"]:
+            del verification_codes[reset_key]
+            return {
+                "success": False,
+                "message": "El token ha expirado. Solicita un nuevo código"
+            }
+        
+        # Verificar token
+        if stored_data["token"] != reset_token:
+            return {
+                "success": False,
+                "message": "Token de recuperación inválido"
+            }
+        
+        # Buscar usuario
+        user = db.query(UsuarioSistema).filter(
+            UsuarioSistema.email == email
+        ).first()
+        
+        if not user:
+            return {
+                "success": False,
+                "message": "Usuario no encontrado"
+            }
+        
+        # Hash de la nueva contraseña
+        hashed_password = hash_password(new_password)
+        
+        # Actualizar contraseña
+        user.clave = hashed_password
+        
+        # Resetear intentos fallidos si existen
+        if hasattr(user, 'intentos_fallidos'):
+            user.intentos_fallidos = 0
+        if hasattr(user, 'bloqueado_hasta'):
+            user.bloqueado_hasta = None
+        if hasattr(user, 'bloqueado_permanente'):
+            user.bloqueado_permanente = False
+        
+        db.commit()
+        
+        # Limpiar códigos de verificación
+        if email in verification_codes:
+            del verification_codes[email]
+        if reset_key in verification_codes:
+            del verification_codes[reset_key]
+        
+        return {
+            "success": True,
+            "message": "Contraseña restablecida exitosamente"
+        }
+    
+    except Exception as e:
+        print(f"❌ Error en reset_password: {e}")
+        db.rollback()
+        return {
+            "success": False,
+            "message": "Error interno del servidor"
+        }
+
+# ========================================
+# REENVIAR CÓDIGO
+# ========================================
+@router.post("/resend-code")
+def resend_verification_code(request: dict, db: Session = Depends(get_db)):
+    """
+    Reenvía un nuevo código de verificación
+    Request body: {"email": "usuario@ejemplo.com"}
+    """
+    try:
+        email = request.get("email", "").strip().lower()
+        
+        if not email:
+            return {
+                "success": False,
+                "message": "El correo electrónico es requerido"
+            }
+        
+        # Eliminar código anterior si existe
+        if email in verification_codes:
+            del verification_codes[email]
+        
+        # Reutilizar la lógica de forgot_password
+        return forgot_password(request, db)
+    
+    except Exception as e:
+        print(f"❌ Error en resend_code: {e}")
+        return {
+            "success": False,
+            "message": "Error interno del servidor"
+        }

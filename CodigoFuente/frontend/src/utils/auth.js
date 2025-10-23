@@ -6,7 +6,7 @@ export const getProfileIcon = (perfil) => {
   const normalizedPerfil = perfil?.toUpperCase() || '';
   const icons = { 
     'ADMINISTRADOR': '👨‍💼',
-    'TESORERO': '💰',
+    'CAJERO': '💰',
     'LECTOR': '📖',
     'CLIENTE': '👤',
     'USUARIO': '👤'
@@ -20,7 +20,7 @@ export const getProfileColor = (perfil) => {
   const normalizedPerfil = perfil?.toUpperCase() || '';
   const colors = {
     'ADMINISTRADOR': 'blue',
-    'TESORERO': 'green',
+    'CAJERO': 'green',
     'LECTOR': 'purple',
     'CLIENTE': 'gray',
     'USUARIO': 'gray'
@@ -39,7 +39,7 @@ export const redirectByProfile = (perfil) => {
   const normalizedPerfil = perfil.toUpperCase();
   const routes = {
     'ADMINISTRADOR': '/admin/dashboard',
-    'TESORERO': '/tesorero/dashboard',
+    'CAJERO': '/cajero/dashboard',
     'LECTOR': '/lector/dashboard',
     'CLIENTE': '/cliente/dashboard',
     'USUARIO': '/cliente/dashboard'
@@ -61,7 +61,7 @@ export const getRoleName = (perfil) => {
   const normalizedPerfil = perfil?.toUpperCase() || '';
   const names = {
     'ADMINISTRADOR': 'Administrador',
-    'TESORERO': 'Tesorero',
+    'CAJERO': 'cajero',
     'LECTOR': 'Lector de Medidores',
     'CLIENTE': 'Cliente',
     'USUARIO': 'Cliente'
@@ -78,7 +78,7 @@ export const isAdmin = (perfil) => {
 // Verificar si un rol tiene permisos de gestión financiera
 export const hasFinancialAccess = (perfil) => {
   const rol = perfil?.toUpperCase();
-  return rol === 'ADMINISTRADOR' || rol === 'TESORERO';
+  return rol === 'ADMINISTRADOR' || rol === 'CAJERO';
 };
 
 // Verificar si un rol puede ver todas las lecturas

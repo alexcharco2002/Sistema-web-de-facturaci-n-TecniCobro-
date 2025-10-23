@@ -598,3 +598,206 @@ async def upload_user_photo(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al guardar la foto"
         )
+# ========================================
+# DESBLOQUEAR USUARIO (ADMINISTRADOR)
+# ========================================
+@router.post("/{user_id}/unlock", status_code=status.HTTP_200_OK)
+def unlock_user_account(
+    user_id: int,
+    payload: dict = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Desbloquea un usuario y resetea sus intentos fallidos
+    Solo admin puede desbloquear usuarios
+    """
+    # Verificar que el usuario sea admin
+    if payload.get("rol") != "administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para desbloquear usuarios"
+        )
+    
+    # Obtener usuario a desbloquear
+    user = db.query(UsuarioSistema).filter(
+        UsuarioSistema.cod_usuario_sistema == user_id
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado"
+        )
+    
+    # Guardar estado anterior para el mensaje
+    was_permanently_blocked = user.bloqueado_permanente
+    was_temporarily_blocked = user.bloqueado_hasta is not None
+    previous_attempts = user.intentos_fallidos
+    
+    # Resetear todos los bloqueos
+    user.intentos_fallidos = 0
+    user.bloqueado_hasta = None
+    user.bloqueado_permanente = False
+    
+    try:
+        db.commit()
+        db.refresh(user)
+        
+        # Mensaje personalizado según el estado anterior
+        if was_permanently_blocked:
+            message = f"Usuario '{user.usuario}' desbloqueado exitosamente (bloqueo permanente removido)"
+        elif was_temporarily_blocked:
+            message = f"Usuario '{user.usuario}' desbloqueado exitosamente (bloqueo temporal removido)"
+        else:
+            message = f"Intentos fallidos reseteados para '{user.usuario}'"
+        
+        return {
+            "success": True,
+            "message": message,
+            "data": {
+                "usuario": user.usuario,
+                "intentos_previos": previous_attempts,
+                "bloqueado_permanente_previo": was_permanently_blocked,
+                "bloqueado_temporal_previo": was_temporarily_blocked
+            }
+        }
+    
+    except Exception as e:
+        db.rollback()
+        print(f"Error al desbloquear usuario: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al desbloquear el usuario"
+        )
+
+
+# ========================================
+# OBTENER ESTADO DE BLOQUEO
+# ========================================
+@router.get("/{user_id}/lock-status", status_code=status.HTTP_200_OK)
+def get_user_lock_status(
+    user_id: int,
+    payload: dict = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene el estado de bloqueo de un usuario
+    Admin puede ver cualquier usuario, usuario normal solo el suyo
+    """
+    # Verificar permisos
+    if payload.get("rol") != "administrador":
+        current_user = db.query(UsuarioSistema).filter(
+            UsuarioSistema.usuario == payload["sub"]
+        ).first()
+        
+        if not current_user or current_user.cod_usuario_sistema != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para ver este estado"
+            )
+    
+    user = db.query(UsuarioSistema).filter(
+        UsuarioSistema.cod_usuario_sistema == user_id
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado"
+        )
+    
+    # Calcular si el bloqueo temporal está activo
+    bloqueado_temporal_activo = False
+    tiempo_restante_minutos = None
+    
+    if user.bloqueado_hasta:
+        ahora = datetime.now()
+        if user.bloqueado_hasta > ahora:
+            bloqueado_temporal_activo = True
+            tiempo_restante = user.bloqueado_hasta - ahora
+            tiempo_restante_minutos = int(tiempo_restante.total_seconds() / 60)
+    
+    return {
+        "success": True,
+        "data": {
+            "usuario": user.usuario,
+            "intentos_fallidos": user.intentos_fallidos,
+            "bloqueado_permanente": user.bloqueado_permanente,
+            "bloqueado_temporal_activo": bloqueado_temporal_activo,
+            "bloqueado_hasta": user.bloqueado_hasta.isoformat() if user.bloqueado_hasta else None,
+            "tiempo_restante_minutos": tiempo_restante_minutos,
+            "intentos_restantes_para_bloqueo_temporal": max(0, 5 - (user.intentos_fallidos % 5)),
+            "intentos_restantes_para_bloqueo_permanente": max(0, 10 - user.intentos_fallidos)
+        }
+    }
+
+
+# ========================================
+# LISTAR USUARIOS BLOQUEADOS
+# ========================================
+@router.get("/admin/blocked-users", status_code=status.HTTP_200_OK)
+def get_blocked_users(
+    payload: dict = Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    """
+    Lista todos los usuarios bloqueados
+    Solo admin puede acceder
+    """
+    # Verificar que el usuario sea admin
+    if payload.get("rol") != "administrador":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos para ver usuarios bloqueados"
+        )
+    
+    ahora = datetime.now()
+    
+    # Usuarios con bloqueo permanente
+    permanently_blocked = db.query(UsuarioSistema).filter(
+        UsuarioSistema.bloqueado_permanente == True
+    ).all()
+    
+    # Usuarios con bloqueo temporal activo
+    temporarily_blocked = db.query(UsuarioSistema).filter(
+        UsuarioSistema.bloqueado_hasta > ahora,
+        UsuarioSistema.bloqueado_permanente == False
+    ).all()
+    
+    # Usuarios con intentos fallidos pero no bloqueados
+    users_with_attempts = db.query(UsuarioSistema).filter(
+        UsuarioSistema.intentos_fallidos > 0,
+        UsuarioSistema.bloqueado_permanente == False,
+        or_(
+            UsuarioSistema.bloqueado_hasta == None,
+            UsuarioSistema.bloqueado_hasta <= ahora
+        )
+    ).all()
+    
+    def format_user_lock_info(user):
+        tiempo_restante = None
+        if user.bloqueado_hasta and user.bloqueado_hasta > ahora:
+            tiempo_restante = int((user.bloqueado_hasta - ahora).total_seconds() / 60)
+        
+        return {
+            "id": user.cod_usuario_sistema,
+            "usuario": user.usuario,
+            "nombre_completo": f"{user.nombres} {user.apellidos}",
+            "email": user.email,
+            "intentos_fallidos": user.intentos_fallidos,
+            "bloqueado_permanente": user.bloqueado_permanente,
+            "bloqueado_hasta": user.bloqueado_hasta.isoformat() if user.bloqueado_hasta else None,
+            "tiempo_restante_minutos": tiempo_restante
+        }
+    
+    return {
+        "success": True,
+        "data": {
+            "permanently_blocked": [format_user_lock_info(u) for u in permanently_blocked],
+            "temporarily_blocked": [format_user_lock_info(u) for u in temporarily_blocked],
+            "users_with_attempts": [format_user_lock_info(u) for u in users_with_attempts],
+            "total_permanently_blocked": len(permanently_blocked),
+            "total_temporarily_blocked": len(temporarily_blocked),
+            "total_with_attempts": len(users_with_attempts)
+        }
+    }
