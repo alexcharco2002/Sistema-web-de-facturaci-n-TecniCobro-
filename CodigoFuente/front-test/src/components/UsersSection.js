@@ -41,7 +41,7 @@ const UsersSection = () => {
     nombres: '',
     apellidos: '',
     cedula: '',
-    correo: '',
+    email: '',
     telefono: '',
     direccion: '',
     rol: 'cliente',
@@ -101,7 +101,7 @@ const UsersSection = () => {
     const matchesSearch = 
       user.nombres.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.correo.toLowerCase().includes(searchTerm.toLowerCase());
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesRole = filterRole === 'all' || user.rol === filterRole;
     
@@ -121,7 +121,7 @@ const UsersSection = () => {
         nombres: '',
         apellidos: '',
         cedula: '',
-        correo: '',
+        email: '',
         telefono: '',
         direccion: '',
         rol: 'cliente',
@@ -134,7 +134,7 @@ const UsersSection = () => {
         nombres: user.nombres,
         apellidos: user.apellidos,
         cedula: user.cedula,
-        correo: user.correo,
+        email: user.email,
         telefono: user.telefono || '',
         direccion: user.direccion || '',
         rol: user.rol,
@@ -476,7 +476,7 @@ const UsersSection = () => {
               <div className="user-contact">
                 <div className="contact-item">
                   <Mail className="w-4 h-4 text-gray-400" />
-                  <span>{user.correo}</span>
+                  <span>{user.email}</span>
                 </div>
                 {user.telefono && (
                   <div className="contact-item">
@@ -571,8 +571,8 @@ const UsersSection = () => {
                     <p>{selectedUser.cedula}</p>
                   </div>
                   <div className="detail-group">
-                    <label>Correo Electrónico:</label>
-                    <p>{selectedUser.correo}</p>
+                    <label>email Electrónico:</label>
+                    <p>{selectedUser.email}</p>
                   </div>
                   {selectedUser.telefono && (
                     <div className="detail-group">
@@ -663,13 +663,13 @@ const UsersSection = () => {
                     </div>
                     
                     <div className="form-group">
-                      <label>Correo Electrónico *</label>
+                      <label>email Electrónico *</label>
                       <input
                         type="email"
                         required
-                        value={formData.correo}
-                        onChange={(e) => setFormData({...formData, correo: e.target.value})}
-                        placeholder="correo@ejemplo.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        placeholder="email@ejemplo.com"
                       />
                     </div>
                     

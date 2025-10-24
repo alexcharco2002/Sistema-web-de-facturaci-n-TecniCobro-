@@ -12,7 +12,7 @@ class UsuarioSistema(Base):
     nombres = Column(String(100), nullable=False)
     apellidos = Column(String(100), nullable=False)
     cedula = Column(String(15), unique=True, nullable=False)
-    correo = Column(String(100), unique=True, nullable=False)
+    email = Column(String(100), unique=True, nullable=False)
     telefono = Column(String(15), nullable=True)
     direccion = Column(String(255), nullable=True)
     rol = Column(String(20), default="cliente", nullable=False)

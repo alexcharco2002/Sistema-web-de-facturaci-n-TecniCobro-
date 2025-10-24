@@ -12,7 +12,6 @@ import LectorDashboard from './pages/lector/Dashboard'; // Panel del lector
 import ClienteDashboard from './pages/cliente/Dashboard'; // Panel del cliente
 import CajeroDashboard from './pages/cajero/Dashboard.js'; // Panel del cajero
 
-import Profile from './pages/admin/Profile';  // Página de perfil de usuario
 
 const App = () => {
   return (
@@ -42,8 +41,7 @@ const App = () => {
         {/* Ruta para el panel del cliente */}
         <Route path="/cliente/dashboard" element={<ClienteDashboard/>} />
         
-        {/* Página de perfil del usuario */}
-        <Route path="/profile" element={<Profile />} />
+       
       </Routes>
     </Router>
   );

@@ -159,7 +159,7 @@ class UsersSecureService {
           nombres: userData.nombres.trim(),
           apellidos: userData.apellidos.trim(),
           cedula: userData.cedula.trim(),
-          correo: userData.correo.trim().toLowerCase(),
+          email: userData.email.trim().toLowerCase(),
           telefono: userData.telefono?.trim() || null,
           direccion: userData.direccion?.trim() || null,
           numtarjeta: userData.numtarjeta?.trim() || null,
@@ -199,7 +199,7 @@ class UsersSecureService {
       if (userData.nombres) updateData.nombres = userData.nombres.trim();
       if (userData.apellidos) updateData.apellidos = userData.apellidos.trim();
       if (userData.cedula) updateData.cedula = userData.cedula.trim();
-      if (userData.correo) updateData.correo = userData.correo.trim().toLowerCase();
+      if (userData.email) updateData.email = userData.email.trim().toLowerCase();
       if (userData.telefono !== undefined) updateData.telefono = userData.telefono?.trim() || null;
       if (userData.direccion !== undefined) updateData.direccion = userData.direccion?.trim() || null;
       if (userData.numtarjeta !== undefined) updateData.numtarjeta = userData.numtarjeta?.trim() || null;
@@ -296,8 +296,8 @@ class UsersSecureService {
         throw new Error('La cédula debe tener al menos 10 dígitos');
       }
 
-      if (!userData.correo || !this.isValidEmail(userData.correo)) {
-        throw new Error('Debe proporcionar un correo electrónico válido');
+      if (!userData.email || !this.isValidEmail(userData.email)) {
+        throw new Error('Debe proporcionar un email electrónico válido');
       }
 
       // Validar número de tarjeta si está presente
@@ -323,8 +323,8 @@ class UsersSecureService {
         throw new Error('La cédula debe tener al menos 10 dígitos');
       }
 
-      if (userData.correo && !this.isValidEmail(userData.correo)) {
-        throw new Error('Debe proporcionar un correo electrónico válido');
+      if (userData.email && !this.isValidEmail(userData.email)) {
+        throw new Error('Debe proporcionar un email electrónico válido');
       }
 
       if (userData.numtarjeta && userData.numtarjeta.trim().length > 0) {

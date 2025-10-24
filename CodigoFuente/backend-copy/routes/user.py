@@ -48,7 +48,7 @@ def user_to_response(user: UsuarioSistema) -> dict:
         "nombres": user.nombres,
         "apellidos": user.apellidos,
         "cedula": user.cedula,
-        "correo": user.correo,
+        "email": user.email,
         "telefono": getattr(user, 'telefono', None),
         "direccion": getattr(user, 'direccion', None),
         "rol": user.rol,
@@ -76,7 +76,7 @@ def get_users(
     Requiere autenticación
     """
     # Verificar que el usuario tenga permisos (solo admin)
-    if payload.get("rol") != "ADMINISTRADOR":
+    if payload.get("rol") != "administrador":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para ver la lista de usuarios"
@@ -89,7 +89,7 @@ def get_users(
         search_filter = or_(
             UsuarioSistema.nombres.ilike(f"%{search}%"),
             UsuarioSistema.apellidos.ilike(f"%{search}%"),
-            UsuarioSistema.correo.ilike(f"%{search}%"),
+            UsuarioSistema.email.ilike(f"%{search}%"),
             UsuarioSistema.usuario.ilike(f"%{search}%")
         )
         query = query.filter(search_filter)
@@ -163,7 +163,7 @@ def create_user(
     Solo admin puede crear usuarios
     """
     # Verificar que el usuario sea admin
-    if payload.get("rol") != "ADMINISTRADOR":
+    if payload.get("rol") != "administrador":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para crear usuarios"
@@ -173,7 +173,7 @@ def create_user(
     existing_user = db.query(UsuarioSistema).filter(
         or_(
             UsuarioSistema.usuario == user_data.usuario,
-            UsuarioSistema.correo == user_data.correo,
+            UsuarioSistema.email == user_data.email,
             UsuarioSistema.cedula == user_data.cedula
         )
     ).first()
@@ -184,10 +184,10 @@ def create_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="El nombre de usuario ya está en uso"
             )
-        elif existing_user.correo == user_data.correo:
+        elif existing_user.email == user_data.email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El correo electrónico ya está registrado"
+                detail="El email electrónico ya está registrado"
             )
         elif existing_user.cedula == user_data.cedula:
             raise HTTPException(
@@ -196,7 +196,7 @@ def create_user(
             )
     
     # Cifrar la contraseña
-    hashed_password = hash_password(user_data.clave)
+    hashed_password = hash_password(user_data.cedula)
     
     # Crear nuevo usuario
     new_user = UsuarioSistema(
@@ -204,8 +204,8 @@ def create_user(
         clave=hashed_password,
         nombres=user_data.nombres.strip(),
         apellidos=user_data.apellidos.strip(),
-        cedula=user_data.cedula.strip(),
-        correo=user_data.correo.strip().lower(),
+        cedula=hashed_password,
+        email=user_data.email.strip().lower(),
         rol=user_data.rol,
         fecha_registro=datetime.now()
     )
@@ -293,15 +293,15 @@ def update_user(
                 detail="El nombre de usuario ya está en uso"
             )
     
-    if user_data.correo and user_data.correo != user.correo:
+    if user_data.email and user_data.email != user.email:
         existing = db.query(UsuarioSistema).filter(
-            UsuarioSistema.correo == user_data.correo,
+            UsuarioSistema.email == user_data.email,
             UsuarioSistema.cod_usuario_sistema != user_id
         ).first()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El correo electrónico ya está registrado"
+                detail="El email electrónico ya está registrado"
             )
     
     if user_data.cedula and user_data.cedula != user.cedula:
@@ -323,7 +323,7 @@ def update_user(
             if field == "clave":
                 # Si se está actualizando la contraseña, cifrarla
                 setattr(user, field, hash_password(value))
-            elif field in ["usuario", "nombres", "apellidos", "correo", "cedula", "telefono", "direccion"]:
+            elif field in ["usuario", "nombres", "apellidos", "email", "cedula", "telefono", "direccion"]:
                 setattr(user, field, value.strip() if isinstance(value, str) else value)
             else:
                 setattr(user, field, value)

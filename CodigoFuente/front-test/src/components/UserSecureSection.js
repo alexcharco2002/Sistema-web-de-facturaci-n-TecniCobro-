@@ -39,7 +39,7 @@ const UsersSecureSection = () => {
     nombres: '',
     apellidos: '',
     cedula: '',
-    correo: '',
+    email: '',
     telefono: '',
     direccion: '',
     numtarjeta: '',
@@ -112,7 +112,7 @@ const UsersSecureSection = () => {
         nombres: '',
         apellidos: '',
         cedula: '',
-        correo: '',
+        email: '',
         telefono: '',
         direccion: '',
         numtarjeta: '',
@@ -125,7 +125,7 @@ const UsersSecureSection = () => {
         nombres: user.nombres,
         apellidos: user.apellidos,
         cedula: user.cedula || '',
-        correo: user.correo || '',
+        email: user.email || '',
         telefono: user.telefono || '',
         direccion: user.direccion || '',
         numtarjeta: user.numtarjeta || '',
@@ -408,7 +408,7 @@ const UsersSecureSection = () => {
                 <div className="contact-item">
                   <Mail className="w-4 h-4 text-gray-400" />
                   <span className="text-xs text-gray-600">
-                    {maskSensitiveData(user.correo, 'email')}
+                    {maskSensitiveData(user.email, 'email')}
                   </span>
                 </div>
                 {user.telefono && (
@@ -513,8 +513,8 @@ const UsersSecureSection = () => {
                     <p className="font-mono text-sm">{maskSensitiveData(selectedUser.cedula, 'cedula')}</p>
                   </div>
                   <div className="detail-group">
-                    <label>Correo (Encriptado):</label>
-                    <p className="font-mono text-sm">{maskSensitiveData(selectedUser.correo, 'email')}</p>
+                    <label>email (Encriptado):</label>
+                    <p className="font-mono text-sm">{maskSensitiveData(selectedUser.email, 'email')}</p>
                   </div>
                   {selectedUser.telefono && (
                     <div className="detail-group">
@@ -603,14 +603,14 @@ const UsersSecureSection = () => {
                     <div className="form-group">
                       <label>
                         <Lock className="w-3 h-3 inline mr-1" />
-                        Correo * (Se encriptará)
+                        email * (Se encriptará)
                       </label>
                       <input
                         type="email"
                         required
-                        value={formData.correo}
-                        onChange={(e) => setFormData({...formData, correo: e.target.value})}
-                        placeholder="correo@ejemplo.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        placeholder="email@ejemplo.com"
                       />
                     </div>
                     

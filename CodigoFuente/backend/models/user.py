@@ -5,6 +5,7 @@ from db.session import Base
 
 class UsuarioSistema(Base):
     __tablename__ = "t_usuario_sistema"
+    __table_args__ = {"schema": "usuarios"}  # <-- aquí va el esquema
     
     # Campos originales
     cod_usuario_sistema = Column(Integer, primary_key=True, index=True)

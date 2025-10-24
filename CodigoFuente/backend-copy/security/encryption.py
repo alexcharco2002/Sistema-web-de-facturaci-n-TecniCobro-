@@ -185,7 +185,7 @@ def test_encryption():
     
     # Datos de prueba
     test_data = {
-        'correo': 'usuario@ejemplo.com',
+        'email': 'usuario@ejemplo.com',
         'cedula': '1234567890',
         'telefono': '0987654321',
         'tarjeta': '1234567890123456'
@@ -212,7 +212,7 @@ def test_encryption():
     
     # Enmascarar
     print("\n👁️ Datos enmascarados:")
-    print(f"  correo: {mask_sensitive_data(test_data['correo'], 'email')}")
+    print(f"  email: {mask_sensitive_data(test_data['email'], 'email')}")
     print(f"  cedula: {mask_sensitive_data(test_data['cedula'], 'cedula')}")
     print(f"  telefono: {mask_sensitive_data(test_data['telefono'], 'phone')}")
     print(f"  tarjeta: {mask_sensitive_data(test_data['tarjeta'], 'card')}")

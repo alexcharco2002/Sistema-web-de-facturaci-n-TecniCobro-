@@ -33,7 +33,7 @@ def user_secure_to_response(user: UsuarioSeguro) -> dict:
         "usuario": user.usuario,
         "nombres": user.nombres,
         "apellidos": user.apellidos,
-        "correo": decrypt_data(user.correo),
+        "email": decrypt_data(user.email),
         "cedula": decrypt_data(user.cedula),
         "telefono": decrypt_data(user.telefono) if user.telefono else None,
         "direccion": decrypt_data(user.direccion) if user.direccion else None,
@@ -59,7 +59,7 @@ def create_secure_user(
     Solo el admin puede crear usuarios.
     """
     # Validar permisos
-    if payload.get("rol") != "ADMINISTRADOR":
+    if payload.get("rol") != "administrador":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para crear usuarios seguros"
@@ -80,7 +80,7 @@ def create_secure_user(
         usuario=user_data.usuario.strip(),
         nombres=user_data.nombres.strip(),
         apellidos=user_data.apellidos.strip(),
-        correo=encrypt_data(user_data.correo),
+        email=encrypt_data(user_data.email),
         cedula=encrypt_data(user_data.cedula),
         telefono=encrypt_data(user_data.telefono) if user_data.telefono else None,
         direccion=encrypt_data(user_data.direccion) if user_data.direccion else None,
@@ -118,7 +118,7 @@ def listar_usuarios_seguros(
     Lista todos los usuarios seguros
     Solo accesible para administradores
     """
-    if payload.get("rol") != "ADMINISTRADOR":
+    if payload.get("rol") != "administrador":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para listar usuarios"
@@ -149,7 +149,7 @@ def obtener_usuario_seguro(
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    if payload.get("rol") != "ADMINISTRADOR" and payload.get("sub") != user.usuario:
+    if payload.get("rol") != "administrador" and payload.get("sub") != user.usuario:
         raise HTTPException(status_code=403, detail="Acceso no autorizado")
 
     return user_secure_to_response(user)

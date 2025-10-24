@@ -609,18 +609,18 @@ const loadDashboardData = useCallback(async () => {
                       <div className="form-group">
                         <label className="form-label">
                           <Mail className="w-4 h-4" />
-                          Correo Electrónico
+                          email Electrónico
                         </label>
                         {editingProfile ? (
                           <input
                             type="email"
                             className="form-input"
-                            value={profileData.correo || ''}
-                            onChange={(e) => handleProfileInputChange('correo', e.target.value)}
-                            placeholder="correo@ejemplo.com"
+                            value={profileData.email || ''}
+                            onChange={(e) => handleProfileInputChange('email', e.target.value)}
+                            placeholder="email@ejemplo.com"
                           />
                         ) : (
-                          <div className="form-value">{profileData.correo || 'No especificado'}</div>
+                          <div className="form-value">{profileData.email || 'No especificado'}</div>
                         )}
                       </div>
 

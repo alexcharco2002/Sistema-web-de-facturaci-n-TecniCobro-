@@ -132,7 +132,7 @@ const UserProfile = ({ user, onLogout }) => {
                 <p className="dropdown-name">
                   {user.nombre_completo || `${user.nombres} ${user.apellidos}`}
                 </p>
-                <p className="dropdown-email">{user.correo || 'Sin email'}</p>
+                <p className="dropdown-email">{user.email || 'Sin email'}</p>
               </div>
             </div>
           </div>

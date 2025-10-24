@@ -113,10 +113,10 @@ def create_test_user():
         admin_user = UsuarioSistema(
             usuario="admin",
             clave=hash_password("admin123"),
-            nombres="Administrador",
+            nombres="administrador",
             apellidos="Sistema",
             cedula="0000000000",
-            correo="admin@sistema.com",
+            email="admin@sistema.com",
             rol="admin",
             fecha_registro=datetime.now()
         )

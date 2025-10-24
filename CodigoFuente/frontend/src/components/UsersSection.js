@@ -427,12 +427,14 @@ const UsersSection = () => {
               </div>
               
               <div className="user-actions">
+                
                 <button 
                   className="action-btn view"
                   onClick={() => openModal('view', user)}
                   title="Ver detalles"
                 >
-                  <Eye className="w-4 h-4" />
+                  
+                  <Eye className="w-4 h-4 icon-view" />
                 </button>
                 <button 
                   className="action-btn edit"

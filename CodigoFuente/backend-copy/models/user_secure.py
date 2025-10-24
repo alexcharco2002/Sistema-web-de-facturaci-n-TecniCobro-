@@ -14,7 +14,7 @@ class UsuarioSeguro(Base):
     usuario = Column(String(50), unique=True, nullable=False, index=True)
     
     # Datos encriptados (tipo TEXT)
-    correo = Column(Text, nullable=False, comment="Correo encriptado con AES-256")
+    email = Column(Text, nullable=False, comment="email encriptado con AES-256")
     cedula = Column(Text, nullable=False, comment="Cédula encriptada con AES-256")
     telefono = Column(Text, nullable=True, comment="Teléfono encriptado con AES-256")
     direccion = Column(Text, nullable=True, comment="Dirección encriptada con AES-256")

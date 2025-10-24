@@ -926,11 +926,13 @@
   gap: 12px;
 }
 
+
+/* =====  BUTON  STYLES ===== */
 .btn-primary {
   display: flex;
   align-items: center;
   padding: 10px 20px;
-  background: var(--primary-light);
+  background: var(--success-color);
   color: white;
   border: none;
   border-radius: 8px;
@@ -941,7 +943,7 @@
 }
 
 .btn-primary:hover {
-  background: var(--primary-dark);
+  background: var(--success-color);
   transform: translateY(-1px);
 }
 

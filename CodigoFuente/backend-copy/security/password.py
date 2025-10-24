@@ -21,7 +21,7 @@ def hash_password(password: str) -> str:
     password_bytes = password.encode('utf-8')
     
     # Generar salt y hash
-    salt = bcrypt.gensalt(rounds=12)  # 12 rondas es un buen balance
+    salt = bcrypt.gensalt(rounds=12)  
     hashed = bcrypt.hashpw(password_bytes, salt)
     
     # Retornar como string

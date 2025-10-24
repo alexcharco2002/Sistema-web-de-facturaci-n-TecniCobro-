@@ -13,7 +13,7 @@ class UserSecureCreate(BaseModel):
     
     # Campos que serán encriptados
     cedula: str = Field(..., min_length=10, max_length=13, description="Cédula (será encriptada)")
-    correo: EmailStr = Field(..., description="Correo electrónico (será encriptado)")
+    email: EmailStr = Field(..., description="email electrónico (será encriptado)")
     telefono: Optional[str] = Field(None, min_length=7, max_length=15, description="Teléfono (será encriptado)")
     direccion: Optional[str] = Field(None, max_length=500, description="Dirección (será encriptada)")
     numtarjeta: Optional[str] = Field(None, min_length=13, max_length=19, description="Número de tarjeta (será encriptado)")
@@ -23,7 +23,7 @@ class UserSecureCreate(BaseModel):
     
     @validator('rol')
     def validate_rol(cls, v):
-        allowed_roles = ['admin', 'cliente', 'operador', 'ADMINISTRADOR', 'CLIENTE', 'OPERADOR']
+        allowed_roles = ['admin', 'cliente', 'operador', 'administrador', 'CLIENTE', 'OPERADOR']
         if v not in allowed_roles:
             raise ValueError(f'El rol debe ser uno de: {", ".join(allowed_roles)}')
         return v
@@ -57,7 +57,7 @@ class UserSecureCreate(BaseModel):
                 "nombres": "Juan",
                 "apellidos": "Pérez García",
                 "cedula": "1234567890",
-                "correo": "juan.perez@ejemplo.com",
+                "email": "juan.perez@ejemplo.com",
                 "telefono": "0987654321",
                 "direccion": "Av. Principal 123, Riobamba",
                 "numtarjeta": "1234567890123456",
@@ -77,7 +77,7 @@ class UserSecureUpdate(BaseModel):
     
     # Campos que serán encriptados
     cedula: Optional[str] = Field(None, min_length=10, max_length=13)
-    correo: Optional[EmailStr] = None
+    email: Optional[EmailStr] = None
     telefono: Optional[str] = Field(None, min_length=7, max_length=15)
     direccion: Optional[str] = Field(None, max_length=500)
     numtarjeta: Optional[str] = Field(None, min_length=13, max_length=19)
@@ -89,7 +89,7 @@ class UserSecureUpdate(BaseModel):
     def validate_rol(cls, v):
         if v is None:
             return v
-        allowed_roles = ['admin', 'cliente', 'operador', 'ADMINISTRADOR', 'CLIENTE', 'OPERADOR']
+        allowed_roles = ['admin', 'cliente', 'operador', 'administrador', 'CLIENTE', 'OPERADOR']
         if v not in allowed_roles:
             raise ValueError(f'El rol debe ser uno de: {", ".join(allowed_roles)}')
         return v
@@ -138,7 +138,7 @@ class UserSecureResponse(BaseModel):
     
     # Datos desencriptados (se muestran al usuario autorizado)
     cedula: Optional[str] = None
-    correo: Optional[str] = None
+    email: Optional[str] = None
     telefono: Optional[str] = None
     direccion: Optional[str] = None
     numtarjeta: Optional[str] = None
@@ -156,7 +156,7 @@ class UserSecureResponse(BaseModel):
                 "nombres": "Juan",
                 "apellidos": "Pérez García",
                 "cedula": "1234567890",
-                "correo": "juan.perez@ejemplo.com",
+                "email": "juan.perez@ejemplo.com",
                 "telefono": "0987654321",
                 "direccion": "Av. Principal 123, Riobamba",
                 "numtarjeta": "1234567890123456",
@@ -178,7 +178,7 @@ class UserSecureListResponse(BaseModel):
     
     # Datos sensibles enmascarados en listados
     cedula: Optional[str] = None
-    correo: Optional[str] = None
+    email: Optional[str] = None
     telefono: Optional[str] = None
     numtarjeta: Optional[str] = None
     
