@@ -40,6 +40,8 @@ const UsersSection = () => {
     clave: '',
     nombres: '',
     apellidos: '',
+    sexo: '',
+    fecha_nac: '',
     cedula: '',
     email: '',
     telefono: '',
@@ -120,6 +122,8 @@ const UsersSection = () => {
         clave: '',
         nombres: '',
         apellidos: '',
+        sexo: '',
+        fecha_nac: '',
         cedula: '',
         email: '',
         telefono: '',
@@ -130,9 +134,10 @@ const UsersSection = () => {
     } else if (type === 'edit' && user) {
       setFormData({
         usuario: user.usuario,
-        clave: '', // No mostrar la contraseña
         nombres: user.nombres,
         apellidos: user.apellidos,
+        sexo: user.sexo || '',
+        fecha_nac: user.fecha_nac || '',
         cedula: user.cedula,
         email: user.email,
         telefono: user.telefono || '',
@@ -164,40 +169,59 @@ const UsersSection = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    
+
     try {
       let result;
-      
-      if (modalType === 'create') {
-        // Validar que se haya ingresado contraseña
-        if (!formData.clave || formData.clave.length < 8) {
-          setError('La contraseña debe tener al menos 8 caracteres');
-          return;
+
+      if (modalType === "create") {
+        // En creación ya no pedimos contraseña manual
+        // El backend genera usuario y contraseña automáticamente
+        const { clave, usuario, ...dataToSend } = formData; // eliminar campos innecesarios
+
+        result = await usersService.createUser(dataToSend);
+
+        if (result.success) {
+          // Si el backend devuelve la contraseña generada, la mostramos
+          const passwordGenerada = result.data?.contraseña_generada;
+          const nombreUsuario = result.data?.usuario;
+
+          await fetchUsers(); // recargar lista
+          closeModal();
+
+          // Mostrar un mensaje informativo al admin
+          alert(
+            `✅ Usuario creado exitosamente.\n\n` +
+            `👤 Usuario: ${nombreUsuario}\n` +
+            (passwordGenerada
+              ? `🔑 Contraseña generada: ${passwordGenerada}`
+              : "")
+          );
+        } else {
+          setError(result.message || "Error al crear el usuario");
         }
-        
-        result = await usersService.createUser(formData);
-      } else if (modalType === 'edit') {
-        // Para edición, no enviamos la contraseña a menos que se haya cambiado
+
+      } else if (modalType === "edit") {
+        // En edición: solo enviamos la clave si fue cambiada
         const updateData = { ...formData };
-        if (!updateData.clave) {
-          delete updateData.clave; // No actualizar contraseña si está vacía
-        }
-        
+        if (!updateData.clave) delete updateData.clave;
+
         result = await usersService.updateUser(selectedUser.id, updateData);
-      }
-      
-      if (result.success) {
-        alert(result.message);
-        await fetchUsers(); // Recargar lista
-        closeModal();
-      } else {
-        setError(result.message);
+
+        if (result.success) {
+          alert("✅ Cambios guardados correctamente");
+          await fetchUsers();
+          closeModal();
+        } else {
+          setError(result.message || "Error al actualizar usuario");
+        }
       }
 
     } catch (error) {
-      setError(error.message || 'Error al guardar usuario');
+      console.error("Error al guardar usuario:", error);
+      setError(error.message || "Error al guardar usuario");
     }
   };
+
 
   // Handler para cambiar contraseña
   const handleChangePassword = async (e) => {
@@ -573,6 +597,20 @@ const UsersSection = () => {
                     <p>{selectedUser.cedula}</p>
                   </div>
                   <div className="detail-group">
+                    <label>Sexo:</label>
+                    <p>
+                      {selectedUser.sexo === "M"
+                        ? "Masculino"
+                        : selectedUser.sexo === "F"
+                        ? "Femenino"
+                        : "No especificado"}
+                    </p>
+                  </div>
+                  <div className="detail-group">
+                    <label>Fecha Nacimiento:</label>
+                    <p>{selectedUser.fecha_nac}</p>
+                  </div>
+                  <div className="detail-group">
                     <label>Email:</label>
                     <p>{selectedUser.email}</p>
                   </div>
@@ -602,137 +640,178 @@ const UsersSection = () => {
               )}
 
               {/* MODAL DE CREACIÓN/EDICIÓN */}
+              {/* MODAL DE CREACIÓN/EDICIÓN */}
               {(modalType === 'create' || modalType === 'edit') && (
                 <form onSubmit={handleSubmit} className="user-form">
                   <div className="form-grid">
-                    <div className="form-group">
-                      <label>Usuario *</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.usuario}
-                        onChange={(e) => setFormData({...formData, usuario: e.target.value})}
-                        placeholder="Nombre de usuario"
-                        disabled={modalType === 'edit'}
-                      />
-                    </div>
-                    
-                    {modalType === 'create' && (
-                      <div className="form-group">
-                        <label>Contraseña *</label>
-                        <input
-                          type="password"
-                          required
-                          value={formData.clave}
-                          onChange={(e) => setFormData({...formData, clave: e.target.value})}
-                          placeholder="Contraseña (min. 8 caracteres)"
-                          minLength="8"
-                        />
-                      </div>
+
+                    {/* 🔒 Ocultar Usuario y Contraseña en creación */}
+                    {modalType === 'edit' && (
+                      <>
+                        <div className="form-group">
+                          <label>Usuario *</label>
+                          <input
+                            type="text"
+                            required
+                            value={formData.usuario}
+                            onChange={(e) =>
+                              setFormData({ ...formData, usuario: e.target.value })
+                            }
+                            placeholder="Nombre de usuario"
+                            disabled={modalType === 'edit'}
+                          />
+                        </div>
+
+                        
+                      </>
                     )}
-                    
+
+                    {/* 🧍 Datos personales */}
                     <div className="form-group">
                       <label>Nombres *</label>
                       <input
                         type="text"
                         required
                         value={formData.nombres}
-                        onChange={(e) => setFormData({...formData, nombres: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, nombres: e.target.value })
+                        }
                         placeholder="Nombres del usuario"
                       />
                     </div>
-                    
+
                     <div className="form-group">
                       <label>Apellidos *</label>
                       <input
                         type="text"
                         required
                         value={formData.apellidos}
-                        onChange={(e) => setFormData({...formData, apellidos: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, apellidos: e.target.value })
+                        }
                         placeholder="Apellidos del usuario"
                       />
                     </div>
-                    
+
+                    <div className="form-group">
+                      <label>Sexo *</label>
+                      <select
+                        required
+                        value={formData.sexo}
+                        onChange={(e) =>
+                          setFormData({ ...formData, sexo: e.target.value })
+                        }
+                      >
+                        <option value="">Seleccione una opción</option>
+                        <option value="M">Masculino</option>
+                        <option value="F">Femenino</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Fecha de Nacimiento *</label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.fecha_nac}
+                        onChange={(e) =>
+                          setFormData({ ...formData, fecha_nac: e.target.value })
+                        }
+                      />
+                    </div>
+
                     <div className="form-group">
                       <label>Cédula *</label>
                       <input
                         type="text"
                         required
                         value={formData.cedula}
-                        onChange={(e) => setFormData({...formData, cedula: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, cedula: e.target.value })
+                        }
                         placeholder="Número de cédula"
                       />
                     </div>
-                    
+
                     <div className="form-group">
-                      <label>email Electrónico *</label>
+                      <label>Correo Electrónico *</label>
                       <input
                         type="email"
                         required
                         value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, email: e.target.value })
+                        }
                         placeholder="email@ejemplo.com"
                       />
                     </div>
-                    
+
                     <div className="form-group">
                       <label>Teléfono</label>
                       <input
                         type="tel"
                         value={formData.telefono}
-                        onChange={(e) => setFormData({...formData, telefono: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, telefono: e.target.value })
+                        }
                         placeholder="Número de teléfono"
                       />
                     </div>
-                    
+
                     <div className="form-group form-group-full">
                       <label>Dirección</label>
                       <textarea
                         value={formData.direccion}
-                        onChange={(e) => setFormData({...formData, direccion: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, direccion: e.target.value })
+                        }
                         placeholder="Dirección completa"
                         rows="3"
                       />
                     </div>
-                    
+
                     <div className="form-group">
                       <label>Rol *</label>
                       <select
                         required
                         value={formData.rol}
-                        onChange={(e) => setFormData({...formData, rol: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, rol: e.target.value })
+                        }
                       >
                         <option value="cliente">Cliente</option>
                         <option value="lector">Lector</option>
                         <option value="cajero">Cajero</option>
                         <option value="administrador">Administrador</option>
-
                       </select>
                     </div>
-                    
+
                     <div className="form-group">
                       <label>Estado</label>
                       <select
                         value={formData.activo}
-                        onChange={(e) => setFormData({...formData, activo: e.target.value === 'true'})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, activo: e.target.value === "true" })
+                        }
                       >
                         <option value="true">Activo</option>
                         <option value="false">Inactivo</option>
                       </select>
                     </div>
                   </div>
-                  
+
                   <div className="form-actions">
                     <button type="button" className="btn-secondary" onClick={closeModal}>
                       Cancelar
                     </button>
                     <button type="submit" className="btn-primary">
                       <Save className="w-4 h-4 mr-2" />
-                      {modalType === 'create' ? 'Crear Usuario' : 'Guardar Cambios'}
+                      {modalType === "create" ? "Crear Usuario" : "Guardar Cambios"}
                     </button>
                   </div>
                 </form>
               )}
+
 
               {/* MODAL DE CAMBIO DE CONTRASEÑA */}
               {modalType === 'password' && (

@@ -1,12 +1,13 @@
-#schemas/user.py
-from pydantic import BaseModel, EmailStr, validator  # Importa BaseModel, EmailStr y validator de Pydantic
-from typing import Optional  # Importa Optional para campos opcionales
-from datetime import datetime # Importa datetime para manejar fechas
+# schemas/user.py
+from pydantic import BaseModel, EmailStr, validator
+from typing import Optional
+from datetime import datetime, date
 
 
 class UserLogin(BaseModel):
     username: str
     password: str
+
 
 class UserOut(BaseModel):
     id: int
@@ -15,6 +16,8 @@ class UserOut(BaseModel):
     apellidos: str
     rol: str
     email: str
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
@@ -27,38 +30,24 @@ class ChangePasswordRequest(BaseModel):
 
 
 # ========================================
-# SCHEMAS DE CREACIÓN
+# SCHEMAS DE CREACIÓN (SIN usuario ni clave)
 # ========================================
 class UserCreate(BaseModel):
-    usuario: str
-    clave: str
+    """
+    Schema para crear usuario - El backend genera automáticamente:
+    - usuario: basado en los nombres (en minúsculas)
+    - clave: la cédula completa
+    """
     nombres: str
     apellidos: str
+    sexo: str  # 'M' o 'F' - OBLIGATORIO
+    fecha_nac: date  # OBLIGATORIO
     cedula: str
     email: EmailStr
     telefono: Optional[str] = None
-    direccion: Optional[str] = None
+    direccion: Optional[str] = "Sanjapamba"
     rol: str = "cliente"
     activo: bool = True
-    
-    @validator('usuario')
-    def validate_usuario(cls, v):
-        v = v.strip()
-        if len(v) < 3:
-            raise ValueError('El usuario debe tener al menos 3 caracteres')
-        if len(v) > 50:
-            raise ValueError('El usuario no puede exceder 50 caracteres')
-        if not v.replace('_', '').replace('.', '').isalnum():
-            raise ValueError('El usuario solo puede contener letras, números, puntos y guiones bajos')
-        return v.lower()
-    
-    @validator('clave')
-    def validate_clave(cls, v):
-        if len(v) < 6:
-            raise ValueError('La contraseña debe tener al menos 6 caracteres')
-        if len(v) > 100:
-            raise ValueError('La contraseña es demasiado larga')
-        return v
     
     @validator('nombres', 'apellidos')
     def validate_nombres(cls, v):
@@ -71,6 +60,31 @@ class UserCreate(BaseModel):
             raise ValueError('El nombre solo puede contener letras y espacios')
         return v.title()
     
+    @validator('sexo')
+    def validate_sexo(cls, v):
+        v = v.strip().upper()
+        if v not in ['M', 'F']:
+            raise ValueError('El sexo debe ser M (Masculino) o F (Femenino)')
+        return v
+    
+    @validator('fecha_nac')
+    def validate_fecha_nac(cls, v):
+        if not v:
+            raise ValueError('La fecha de nacimiento es obligatoria')
+        
+        # Calcular edad
+        today = date.today()
+        age = today.year - v.year - ((today.month, today.day) < (v.month, v.day))
+        
+        if age < 0:
+            raise ValueError('La fecha de nacimiento no puede ser futura')
+        if age < 10:
+            raise ValueError('El usuario debe tener al menos 10 años')
+        if age > 120:
+            raise ValueError('La fecha de nacimiento no es válida')
+        
+        return v
+    
     @validator('cedula')
     def validate_cedula(cls, v):
         v = v.strip()
@@ -78,13 +92,14 @@ class UserCreate(BaseModel):
             raise ValueError('La cédula es requerida')
         if len(v) < 8 or len(v) > 15:
             raise ValueError('La cédula debe tener entre 8 y 15 caracteres')
-        if not v.replace('-', '').isalnum():
-            raise ValueError('La cédula solo puede contener letras, números y guiones')
+        # Aceptar solo números y guiones
+        if not v.replace('-', '').isdigit():
+            raise ValueError('La cédula solo puede contener números y guiones')
         return v
     
     @validator('rol')
     def validate_rol(cls, v):
-        roles_validos = ['cliente', 'lector', 'cajero', 'administraador' ]
+        roles_validos = ['cliente', 'lector', 'cajero', 'administrador']
         if v not in roles_validos:
             raise ValueError(f'El rol debe ser uno de: {", ".join(roles_validos)}')
         return v
@@ -93,7 +108,6 @@ class UserCreate(BaseModel):
     def validate_telefono(cls, v):
         if v:
             v = v.strip()
-            # Eliminar espacios y guiones para validar
             clean_phone = v.replace(' ', '').replace('-', '').replace('+', '')
             if not clean_phone.isdigit():
                 raise ValueError('El teléfono solo puede contener números, espacios, guiones y el símbolo +')
@@ -104,18 +118,19 @@ class UserCreate(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "usuario": "jperez",
-                "clave": "password123",
-                "nombres": "Juan",
-                "apellidos": "Pérez",
+                "nombres": "Juan Carlos",
+                "apellidos": "Pérez González",
+                "sexo": "M",
+                "fecha_nac": "1990-05-15",
                 "cedula": "1234567890",
-                "email": "jperez@example.com",
+                "email": "juan.perez@example.com",
                 "telefono": "0987654321",
-                "direccion": "Av. Principal 123",
+                "direccion": "Sanjapamba",
                 "rol": "cliente",
                 "activo": True
             }
         }
+
 
 # ========================================
 # SCHEMAS DE ACTUALIZACIÓN
@@ -125,6 +140,8 @@ class UserUpdate(BaseModel):
     clave: Optional[str] = None
     nombres: Optional[str] = None
     apellidos: Optional[str] = None
+    sexo: Optional[str] = None
+    fecha_nac: Optional[date] = None
     cedula: Optional[str] = None
     email: Optional[EmailStr] = None
     telefono: Optional[str] = None
@@ -167,20 +184,29 @@ class UserUpdate(BaseModel):
             return v.title()
         return v
     
+    @validator('sexo')
+    def validate_sexo(cls, v):
+        if v:
+            v = v.strip().upper()
+            if v not in ['M', 'F']:
+                raise ValueError('El sexo debe ser M o F')
+            return v
+        return v
+    
     @validator('cedula')
     def validate_cedula(cls, v):
         if v:
             v = v.strip()
             if len(v) < 8 or len(v) > 15:
                 raise ValueError('La cédula debe tener entre 8 y 15 caracteres')
-            if not v.replace('-', '').isalnum():
-                raise ValueError('La cédula solo puede contener letras, números y guiones')
+            if not v.replace('-', '').isdigit():
+                raise ValueError('La cédula solo puede contener números y guiones')
         return v
     
     @validator('rol')
     def validate_rol(cls, v):
         if v:
-            roles_validos = ['cliente', 'lector', 'cajero', 'administraador' ]
+            roles_validos = ['cliente', 'lector', 'cajero', 'administrador']
             if v not in roles_validos:
                 raise ValueError(f'El rol debe ser uno de: {", ".join(roles_validos)}')
         return v
@@ -201,12 +227,14 @@ class UserUpdate(BaseModel):
             "example": {
                 "nombres": "Juan Carlos",
                 "apellidos": "Pérez González",
+                "sexo": "M",
                 "email": "jperez_nuevo@example.com",
                 "telefono": "0987654322",
                 "direccion": "Av. Nueva 456",
                 "activo": True
             }
         }
+
 
 # ========================================
 # SCHEMAS DE RESPUESTA
@@ -216,6 +244,8 @@ class UserResponse(BaseModel):
     usuario: str
     nombres: str
     apellidos: str
+    sexo: Optional[str] = None
+    fecha_nac: Optional[date] = None
     cedula: str
     email: str
     telefono: Optional[str] = None
@@ -228,16 +258,22 @@ class UserResponse(BaseModel):
     
     class Config:
         from_attributes = True
+        json_encoders = {
+            date: lambda v: v.strftime("%Y-%m-%d") if v else None,
+            datetime: lambda v: v.isoformat() if v else None
+        }
         json_schema_extra = {
             "example": {
                 "id": 1,
-                "usuario": "jperez",
-                "nombres": "Juan",
-                "apellidos": "Pérez",
+                "usuario": "juancarlos",
+                "nombres": "Juan Carlos",
+                "apellidos": "Pérez González",
+                "sexo": "M",
+                "fecha_nac": "1990-05-15",
                 "cedula": "1234567890",
-                "email": "jperez@example.com",
+                "email": "juan.perez@example.com",
                 "telefono": "0987654321",
-                "direccion": "Av. Principal 123",
+                "direccion": "Sanjapamba",
                 "rol": "cliente",
                 "activo": True,
                 "fecha_registro": "2024-01-15T10:30:00",
@@ -246,19 +282,26 @@ class UserResponse(BaseModel):
             }
         }
 
+
 class UserListResponse(BaseModel):
     id: int
     usuario: str
     nombres: str
     apellidos: str
+    sexo: Optional[str] = None
+    fecha_nac: Optional[date] = None
     email: str
     cedula: str
-    telefono: Optional[str] = None # Telefono es opcional
-    direccion: Optional[str] = None # Direccion es opcional 
+    telefono: Optional[str] = None
+    direccion: Optional[str] = None
     rol: str
     activo: bool
-    fecha_registro: Optional[str] = None
+    fecha_registro: Optional[datetime] = None
     foto: Optional[str] = None
     
     class Config:
         from_attributes = True
+        json_encoders = {
+            date: lambda v: v.strftime("%Y-%m-%d") if v else None,
+            datetime: lambda v: v.isoformat() if v else None
+        }

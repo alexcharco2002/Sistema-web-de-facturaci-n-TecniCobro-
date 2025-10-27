@@ -22,7 +22,7 @@ router = APIRouter(tags=["auth"])
 # ========================================
 MAX_INTENTOS_TEMPORALES = 5      # Intentos antes de bloqueo temporal
 TIEMPO_BLOQUEO_TEMPORAL = 15     # Minutos de bloqueo temporal
-MAX_INTENTOS_PERMANENTES = 10    # Intentos totales antes de bloqueo permanente
+MAX_INTENTOS_PERMANENTES = 8    # Intentos totales antes de bloqueo permanente
 
 def get_db():
     db = SessionLocal()
@@ -125,7 +125,7 @@ def registrar_intento_fallido(db: Session, user: UsuarioSistema) -> dict:
         "bloqueado": False,
         "tipo": "advertencia",
         "intentos": intentos_actuales,
-        "mensaje": f"Credenciales incorrectas. Te quedan {intentos_restantes_temporal} intentos antes del bloqueo temporal. Total de intentos: {intentos_actuales}/{MAX_INTENTOS_PERMANENTES}",
+        "mensaje": f"Crontraseña Incorrecta. Te quedan {intentos_restantes_temporal} intentos antes de que tu cuenta sea bloqueada temporalmente.",
         "intentos_restantes_temporal": intentos_restantes_temporal,
         "intentos_restantes_permanente": intentos_restantes_permanente
     }
@@ -155,12 +155,13 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
             UsuarioSistema.usuario == user.username.strip().lower()
         ).first()
 
+        # Verificar si el usuario existe
         if not db_user:
             return {
                 "success": False,
-                "message": "Credenciales inválidas, Usuario no registrado"
+                "message": "El usuario ingresado no existe. Verifique el nombre de usuario."
             }
-        
+
         # Verificar si el usuario está activo
         if hasattr(db_user, 'activo') and not db_user.activo:
             return {

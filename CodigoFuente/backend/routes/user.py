@@ -47,6 +47,8 @@ def user_to_response(user: UsuarioSistema) -> dict:
         "usuario": user.usuario,
         "nombres": user.nombres,
         "apellidos": user.apellidos,
+        "sexo": user.sexo,  # ✅ Agregado
+        "fecha_nac": user.fecha_nac.isoformat() if user.fecha_nac else None,  # ✅ Agregado
         "cedula": user.cedula,
         "email": user.email,
         "telefono": getattr(user, 'telefono', None),
@@ -152,6 +154,7 @@ def get_user(
 # ========================================
 # CREAR USUARIO
 # ========================================
+
 @router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def create_user(
     user_data: UserCreate,
@@ -159,8 +162,11 @@ def create_user(
     db: Session = Depends(get_db)
 ):
     """
-    Crea un nuevo usuario
-    Solo admin puede crear usuarios
+    Crea un nuevo usuario.
+    Solo el administrador puede crear usuarios.
+    
+    ✅ Usuario: se genera automáticamente en minúsculas a partir del nombre
+    ✅ Contraseña: es la cédula completa
     """
     # Verificar que el usuario sea admin
     if payload.get("rol") != "administrador":
@@ -168,71 +174,119 @@ def create_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para crear usuarios"
         )
+
+    # ===============================
+    # 1️⃣ Normalizar y generar usuario automáticamente
+    # ===============================
+    # Tomar primer nombre y quitarle espacios/acentos
+    primer_nombre = user_data.nombres.strip().split()[0].lower()
+    # Remover acentos básicos
+    primer_nombre = primer_nombre.replace('á', 'a').replace('é', 'e').replace('í', 'i')
+    primer_nombre = primer_nombre.replace('ó', 'o').replace('ú', 'u').replace('ñ', 'n')
     
-    # Verificar si el usuario ya existe
+    base_username = primer_nombre
+    username = base_username
+
+    # Si ya existe un usuario igual, agregar año de nacimiento o contador
+    counter = 1
+    while db.query(UsuarioSistema).filter(UsuarioSistema.usuario == username).first():
+        if user_data.fecha_nac:
+            username = f"{base_username}{user_data.fecha_nac.year}"
+            # Si aún existe, agregar contador
+            if db.query(UsuarioSistema).filter(UsuarioSistema.usuario == username).first():
+                username = f"{base_username}{user_data.fecha_nac.year}{counter}"
+                counter += 1
+        else:
+            username = f"{base_username}{counter}"
+            counter += 1
+
+    print(f"✅ Usuario generado: {username}")
+
+    # ===============================
+    # 2️⃣ Generar contraseña = CÉDULA
+    # ===============================
+    if not user_data.cedula or len(user_data.cedula.strip()) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cédula inválida (debe tener al menos 8 caracteres)."
+        )
+
+    raw_password = user_data.cedula.strip()  # ✅ Contraseña = cédula completa
+    hashed_password = hash_password(raw_password)
+    
+    print(f"✅ Contraseña generada: {raw_password}")
+
+    # ===============================
+    # 3️⃣ Verificar email o cédula duplicada
+    # ===============================
     existing_user = db.query(UsuarioSistema).filter(
         or_(
-            UsuarioSistema.usuario == user_data.usuario,
             UsuarioSistema.email == user_data.email,
             UsuarioSistema.cedula == user_data.cedula
         )
     ).first()
-    
+
     if existing_user:
-        if existing_user.usuario == user_data.usuario:
+        if existing_user.email == user_data.email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El nombre de usuario ya está en uso"
-            )
-        elif existing_user.email == user_data.email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El email electrónico ya está registrado"
+                detail="El correo electrónico ya está registrado"
             )
         elif existing_user.cedula == user_data.cedula:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="La cédula ya está registrada"
             )
-    
-    # Cifrar la contraseña
-    hashed_password = hash_password(user_data.clave)
-    
-    # Crear nuevo usuario
+
+    # ===============================
+    # 4️⃣ Crear el nuevo usuario
+    # ===============================
     new_user = UsuarioSistema(
-        usuario=user_data.usuario.strip(),
+        usuario=username,
         clave=hashed_password,
         nombres=user_data.nombres.strip(),
         apellidos=user_data.apellidos.strip(),
+        sexo=user_data.sexo.strip().upper(),  # ✅ 'M' o 'F'
+        fecha_nac=user_data.fecha_nac,  # ✅ IMPORTANTE: campo correcto
         cedula=user_data.cedula.strip(),
         email=user_data.email.strip().lower(),
         rol=user_data.rol,
         fecha_registro=datetime.now()
     )
-    
-    # Agregar campos opcionales si existen en el modelo
-    if hasattr(UsuarioSistema, 'telefono') and user_data.telefono:
+
+    # ===============================
+    # 5️⃣ Agregar campos opcionales
+    # ===============================
+    if user_data.telefono:
         new_user.telefono = user_data.telefono.strip()
-    
-    if hasattr(UsuarioSistema, 'direccion') and user_data.direccion:
+
+    if user_data.direccion:
         new_user.direccion = user_data.direccion.strip()
-    
-    if hasattr(UsuarioSistema, 'activo'):
-        new_user.activo = user_data.activo
-    
+
+    new_user.activo = user_data.activo
+
+    # ===============================
+    # 6️⃣ Guardar usuario
+    # ===============================
     try:
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        
-        return user_to_response(new_user)
-    
+
+        print(f"✅ Usuario creado exitosamente: {username}")
+
+        # ✅ Devolver respuesta con datos generados
+        response_data = user_to_response(new_user)
+        response_data["contraseña_generada"] = raw_password  # Mostrar solo UNA VEZ
+
+        return response_data
+
     except Exception as e:
         db.rollback()
-        print(f"Error al crear usuario: {e}")
+        print(f"❌ Error al crear usuario: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al crear el usuario"
+            detail=f"Error al crear el usuario: {str(e)}"
         )
 
 

@@ -108,7 +108,7 @@ const ProfileSection = ({
               <div className="form-group">
                 <label className="form-label">
                   <Mail className="w-4 h-4" />
-                  email Electrónico
+                  Correo Electrónico
                 </label>
                 {editingProfile ? (
                   <input

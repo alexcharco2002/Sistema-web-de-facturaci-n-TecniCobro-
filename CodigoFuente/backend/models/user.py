@@ -47,7 +47,7 @@ class UsuarioSistema(Base):
             "rol": self.rol,
             "activo": self.activo,
             "sexo": self.sexo,
-            "fecha_nac": self.fecha_nac.isoformat() if self.fecha_nac else None,
+            "fecha_nac": self.fecha_nac.strftime("%Y-%m-%d") if self.fecha_nac else None,
             "fecha_registro": self.fecha_registro.isoformat() if self.fecha_registro else None,
             "ultimo_acceso": self.ultimo_acceso.isoformat() if self.ultimo_acceso else None,
             "intentos_fallidos": self.intentos_fallidos,

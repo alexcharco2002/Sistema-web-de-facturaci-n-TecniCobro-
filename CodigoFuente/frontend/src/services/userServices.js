@@ -155,14 +155,15 @@ class UsersService {
       const data = await this.makeRequest(API_CONFIG.endpoints.users, {
         method: 'POST',
         body: JSON.stringify({
-          usuario: userData.usuario.trim().toLowerCase(),
-          clave: userData.clave.trim(),
+          
           nombres: userData.nombres.trim(),
           apellidos: userData.apellidos.trim(),
+          sexo: userData.sexo || 'otro',  // otro si no se proporciona
+          fecha_nac: userData.fecha_nac || null, // null si no se proporciona
           cedula: userData.cedula.trim(),
           email: userData.email.trim().toLowerCase(),
           telefono: userData.telefono?.trim() || null,
-          direccion: userData.direccion?.trim() || null,
+          direccion: userData.direccion?.trim() || 'Sanjapamba', // Valor por defecto
           rol: userData.rol || 'cliente',
           activo: userData.activo !== undefined ? userData.activo : true
         })
@@ -363,14 +364,7 @@ class UsersService {
    */
   validateUserData(userData, required = true) {
     if (required) {
-      if (!userData.usuario || userData.usuario.trim().length < 3) {
-        throw new Error('El usuario debe tener al menos 3 caracteres');
-      }
-
-      if (!userData.clave || userData.clave.length < 8) {
-        throw new Error('La contraseña debe tener al menos 8 caracteres');
-      }
-
+      // Validaciones para CREACIÓN
       if (!userData.nombres || userData.nombres.trim().length < 2) {
         throw new Error('El nombre debe tener al menos 2 caracteres');
       }
@@ -379,35 +373,43 @@ class UsersService {
         throw new Error('Los apellidos deben tener al menos 2 caracteres');
       }
 
+      if (!userData.sexo || !['M', 'F'].includes(userData.sexo.toUpperCase())) {
+        throw new Error('Debe seleccionar un sexo válido (M o F)');
+      }
+
+      if (!userData.fecha_nac) {
+        throw new Error('Debe proporcionar una fecha de nacimiento');
+      }
+
       if (!userData.cedula || userData.cedula.trim().length < 8) {
         throw new Error('La cédula debe tener al menos 8 caracteres');
       }
 
       if (!userData.email || !this.isValidEmail(userData.email)) {
-        throw new Error('Debe proporcionar un email electrónico válido');
+        throw new Error('Debe proporcionar un Correo Electrónico válido');
       }
     } else {
-      // Validaciones para actualización (solo si el campo está presente)
+      // Validaciones para ACTUALIZACIÓN (solo si el campo está presente)
       if (userData.usuario && userData.usuario.trim().length < 3) {
         throw new Error('El usuario debe tener al menos 3 caracteres');
       }
 
-      if (userData.clave && userData.clave.length < 8) {
-        throw new Error('La contraseña debe tener al menos 8 caracteres');
-      }
-
       if (userData.email && !this.isValidEmail(userData.email)) {
-        throw new Error('Debe proporcionar un email electrónico válido');
+        throw new Error('Debe proporcionar un Correo Electrónico válido');
       }
-    }
 
-    // Validar rol si está presente
-    if (userData.rol) {
-      const rolesValidos = ['cliente', 'lector', 'cajero', 'administraador' ];
-      if (!rolesValidos.includes(userData.rol)) {
-        throw new Error('El rol debe ser administrador, lector, cajero u cliente');
+      if (userData.sexo && !['M', 'F'].includes(userData.sexo.toUpperCase())) {
+        throw new Error('El sexo debe ser M o F');
       }
+  }
+
+  // Validar rol si está presente
+  if (userData.rol) {
+    const rolesValidos = ['cliente', 'lector', 'cajero', 'administrador'];
+    if (!rolesValidos.includes(userData.rol)) {
+      throw new Error('El rol debe ser administrador, lector, cajero o cliente');
     }
+  }
   }
 
   /**
