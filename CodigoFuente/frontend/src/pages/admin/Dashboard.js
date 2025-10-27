@@ -1,16 +1,19 @@
 // src/pages/admin/Dashboard.js
-// Panel de Administración - Dashboard.js
+// Panel de Administración - Dashboard.js con datos reales 593
 
 //importar librerías y servicios
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import authService from '../../services/authServices';
+import authService from '../../services/authServices';   // Servicio de autenticación
+import userService from '../../services/userServices';   // Servicio para manejar datos de usuarios
+
 
 // Importar componentes separados
 import NotificationDropdown from '../../components/NotificationDropdown';
 import UserProfile from '../../components/UserProfile';
 import UsersSection from '../../components/UsersSection';
 import InvoicesSection from '../../components/InvoicesSection';
+import ProfileSection from '../../components/ProfileSection';
 
 //Importar estilos
 import './style.css';
@@ -31,39 +34,31 @@ import {
   AlertCircle,
   RefreshCw,
   User,
-  Edit,
-  Save,
-  X,
-  Camera,
-  Mail,
-  Phone,
-  MapPin,
   Shield
 } from 'lucide-react';
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('overview');
-  const [notifications] = useState([
-    // Ejemplo de notificaciones
-    {
-      id: 1,
-      type: 'warning',
-      message: 'Factura #1234 pendiente de pago',
-      time: '5 min ago',
-      read: false
-    },
-    {
-      id: 2,
-      type: 'success',
-      message: 'Backup del sistema completado',
-      time: '1 hora ago',
-      read: true
-    }
-  ]);
+  const [notifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
-  const [editingProfile, setEditingProfile] = useState(false);
-  const [profileData, setProfileData] = useState({});
+
+  // Estados para datos reales
+  
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    inactiveUsers: 0,
+    usersByRole: {
+      administrador: 0,
+      cliente: 0,
+      lector: 0,
+      cajero: 0
+    }
+  });
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState(null);
 
   useEffect(() => {
     // Verificar autenticación y obtener datos del usuario
@@ -76,10 +71,9 @@ const AdminDashboard = () => {
     }
 
     setUser(currentUser);
-    setProfileData(currentUser);
     console.log('Usuario autenticado:', currentUser);
 
-    // Opcional: Verificar sesión con el servidor
+    // Verificar sesión con el servidor
     const verifySession = async () => {
       const result = await authService.verifySession();
       if (!result.success) {
@@ -91,6 +85,66 @@ const AdminDashboard = () => {
     verifySession();
   }, [navigate]);
 
+  // Cargar datos reales de usuarios
+  useEffect(() => {
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
+
+  // Función para cargar datos del dashboard
+  const loadDashboardData = async () => {
+    try {
+      setDataLoading(true);
+      setDataError(null);
+
+      // Obtener todos los usuarios
+      const result = await userService.getUsers({
+        limit: 1000 // Obtener todos los usuarios para estadísticas
+      });
+
+      if (result.success) {
+        const usersData = Array.isArray(result.data) 
+        ? result.data 
+        : result.data.usuarios || [];
+
+        // Calcular estadísticas reales
+        const totalUsers = usersData.length;
+        const activeUsers = usersData.filter(u => u.activo).length;
+        const inactiveUsers = totalUsers - activeUsers;
+
+        // Contar usuarios por rol
+        const usersByRole = usersData.reduce((acc, user) => {
+          const rol = user.rol?.toLowerCase() || 'sin_rol';
+          acc[rol] = (acc[rol] || 0) + 1;
+          return acc;
+        }, {
+          administrador: 0,
+          cliente: 0,
+          lector: 0,
+          cajero: 0
+        });
+
+        setStats({
+          totalUsers,
+          activeUsers,
+          inactiveUsers,
+          usersByRole
+        });
+
+      } else {
+        setDataError(result.message || 'Error al cargar datos');
+        console.error('Error cargando usuarios:', result.message);
+      }
+
+    } catch (error) {
+      console.error('Error cargando datos del dashboard:', error);
+      setDataError('Error al cargar datos del dashboard');
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
   // Función para manejar el cierre de sesión
   const handleLogout = async () => {
     if (window.confirm('¿Estás seguro de que deseas cerrar sesión?')) {
@@ -99,35 +153,28 @@ const AdminDashboard = () => {
         navigate('/login');
       } catch (error) {
         console.error('Error en logout:', error);
-        // Aún así redirigir al login
         navigate('/login');
       }
     }
   };
 
   // Función para manejar el refresh
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    await loadDashboardData();
+    setLoading(false);
   };
 
   // Handlers para las notificaciones
   const handleMarkAsRead = (notificationId) => {
     console.log('Marcar como leída:', notificationId);
-    // Aquí iría la lógica para marcar la notificación como leída
   };
 
   const handleViewAllNotifications = () => {
     console.log('Ver todas las notificaciones');
-    // Aquí iría la lógica para mostrar todas las notificaciones
   };
 
-  // Handlers para el perfil de usuario
-  const handleProfileClick = () => {
-    setActiveSection('profile');
-  };
+  
 
   const handleSettingsClick = () => {
     setActiveSection('settings');
@@ -135,59 +182,66 @@ const AdminDashboard = () => {
 
   // Handler para actualizar perfil
   const handleUpdateProfile = async (profileData) => {
-    try {
-      // Aquí iría la llamada al servicio para actualizar el perfil
-      console.log('Actualizando perfil:', profileData);
-      
-      // Simular llamada async
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Error al actualizar perfil:', error);
-      return { success: false, message: error.message };
+  try {
+    console.log('📤 Actualizando perfil con datos:', profileData);
+    
+    // Validar que tenemos el ID del usuario
+    if (!user?.id_usuario_sistema) {
+      throw new Error('No se encontró el ID del usuario');
     }
-  };
 
+    // Preparar los datos para enviar al backend
+    const dataToUpdate = {
+      nombres: profileData.nombres,
+      apellidos: profileData.apellidos,
+      sexo: profileData.sexo,
+      fecha_nac: profileData.fecha_nac,
+      email: profileData.email,
+      telefono: profileData.telefono || null,
+      direccion: profileData.direccion || null,
+      // No incluir rol, activo, fecha_registro (campos del sistema)
+    };
 
-  // Funciones para manejar el perfil
-  const handleEditProfile = () => {
-    setEditingProfile(true);
-  };
+    console.log('📦 Datos a enviar al backend:', dataToUpdate);
 
-  const handleSaveProfile = async () => {
-    try {
-      const result = await handleUpdateProfile(profileData);
-      if (result.success) {
-        setUser(profileData);
-        setEditingProfile(false);
-        alert('Perfil actualizado correctamente');
-      } else {
-        alert('Error al actualizar el perfil: ' + (result.message || 'Error desconocido'));
-      }
-    } catch (error) {
-      console.error('Error al actualizar perfil:', error);
-      alert('Error al actualizar el perfil');
+    // Llamar al servicio de usuarios (asume que lo tienes importado)
+    const result = await userService.updateUser(user.id_usuario_sistema, dataToUpdate);
+    
+    if (result.success) {
+      console.log('✅ Perfil actualizado exitosamente:', result.data);
+      
+      // Actualizar el estado local con los datos devueltos por el backend
+      setUser(prevUser => ({
+        ...prevUser,
+        ...result.data
+      }));
+      
+      return { 
+        success: true,
+        message: 'Perfil actualizado correctamente'
+      };
+    } else {
+      console.error('❌ Error del servidor:', result.message);
+      return { 
+        success: false, 
+        message: result.message || 'Error al actualizar el perfil'
+      };
     }
-  };
+    
+  } catch (error) {
+    console.error('❌ Error al actualizar perfil:', error);
+    return { 
+      success: false, 
+      message: error.message || 'Error al actualizar el perfil'
+    };
+  }
+};
 
-  const handleCancelEdit = () => {
-    setProfileData(user);
-    setEditingProfile(false);
-  };
-
-  const handleProfileInputChange = (field, value) => {
-    setProfileData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  // Función para obtener las iniciales del usuario
-  const getUserInitials = (nombres, apellidos) => {
-    const firstInitial = nombres ? nombres.charAt(0).toUpperCase() : '';
-    const lastInitial = apellidos ? apellidos.charAt(0).toUpperCase() : '';
-    return firstInitial + lastInitial || 'U';
+  // Calcular cambio porcentual (simulado por ahora)
+  const calculatePercentageChange = (current, previous = 0) => {
+    if (previous === 0) return '+100%';
+    const change = ((current - previous) / previous) * 100;
+    return change >= 0 ? `+${change.toFixed(1)}%` : `${change.toFixed(1)}%`;
   };
 
   // Mostrar loading mientras se carga el usuario
@@ -212,59 +266,41 @@ const AdminDashboard = () => {
     { id: 'settings', label: 'Configuración', icon: Settings }
   ];
 
-  const stats = [
+  // Tarjetas de estadísticas con datos reales
+  const statCards = [
     { 
       title: 'Total Usuarios', 
-      value: '1,247', 
-      change: '+12%', 
+      value: dataLoading ? '...' : stats.totalUsers.toString(), 
+      change: calculatePercentageChange(stats.totalUsers), 
       color: 'blue',
       icon: Users,
       trend: 'up'
     },
     { 
-      title: 'Facturas Mes', 
-      value: '89', 
-      change: '+5%', 
+      title: 'Usuarios Activos', 
+      value: dataLoading ? '...' : stats.activeUsers.toString(), 
+      change: calculatePercentageChange(stats.activeUsers), 
       color: 'green',
-      icon: FileText,
+      icon: Activity,
       trend: 'up'
     },
     { 
-      title: 'Ingresos', 
-      value: '$12,450', 
-      change: '+18%', 
+      title: 'Clientes', 
+      value: dataLoading ? '...' : (stats.usersByRole.cliente || 0).toString(), 
+      change: calculatePercentageChange(stats.usersByRole.cliente), 
       color: 'emerald',
-      icon: DollarSign,
+      icon: User,
       trend: 'up'
     },
     { 
-      title: 'Pendientes', 
-      value: '23', 
-      change: '-8%', 
+      title: 'Usuarios Inactivos', 
+      value: dataLoading ? '...' : stats.inactiveUsers.toString(), 
+      change: calculatePercentageChange(stats.inactiveUsers), 
       color: 'orange',
       icon: AlertCircle,
-      trend: 'down'
+      trend: stats.inactiveUsers > 0 ? 'down' : 'up'
     }
   ];
-
-  const recentActivity = [
-    { id: 1, action: 'Nueva factura generada', user: 'Juan Pérez', time: '2 min ago', type: 'invoice', status: 'success' },
-    { id: 2, action: 'Pago procesado', user: 'María González', time: '5 min ago', type: 'payment', status: 'success' },
-    { id: 3, action: 'Usuario registrado', user: 'Carlos López', time: '10 min ago', type: 'user', status: 'info' },
-    { id: 4, action: 'Lectura actualizada', user: 'Ana Martín', time: '15 min ago', type: 'reading', status: 'warning' },
-    { id: 5, action: 'Backup completado', user: 'Sistema', time: '30 min ago', type: 'system', status: 'success' }
-  ];
-
-  const getActivityIcon = (type) => {
-    switch(type) {
-      case 'invoice': return FileText;
-      case 'payment': return DollarSign;
-      case 'user': return Users;
-      case 'reading': return Activity;
-      case 'system': return Settings;
-      default: return Activity;
-    }
-  };
 
   // Componente de estadísticas
   const StatCard = ({ stat }) => {
@@ -351,8 +387,9 @@ const AdminDashboard = () => {
                 className={`refresh-btn ${loading ? 'loading' : ''}`}
                 onClick={handleRefresh}
                 title="Actualizar datos"
+                disabled={loading}
               >
-                <RefreshCw className="w-5 h-5" />
+                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
               </button>
 
               {/* Notifications Component */}
@@ -366,8 +403,9 @@ const AdminDashboard = () => {
               <UserProfile
                 user={user}
                 onLogout={handleLogout}
-                onProfileClick={handleProfileClick}
+                onViewProfile={() => setActiveSection('profile')}
                 onSettingsClick={handleSettingsClick}
+
               />
             </div>
           </div>
@@ -377,36 +415,72 @@ const AdminDashboard = () => {
         <main className="content">
           {activeSection === 'overview' && (
             <div>
+              {/* Error Message */}
+              {dataError && (
+                <div className="error-banner">
+                  <AlertCircle className="w-5 h-5" />
+                  <span>{dataError}</span>
+                  <button onClick={handleRefresh} className="btn-link">
+                    Reintentar
+                  </button>
+                </div>
+              )}
+
               {/* Stats Grid */}
               <div className="stats-grid">
-                {stats.map((stat, index) => (
+                {statCards.map((stat, index) => (
                   <StatCard key={index} stat={stat} />
                 ))}
               </div>
 
               {/* Content Grid */}
               <div className="content-grid">
-                {/* Recent Activity */}
+                {/* Distribución de Usuarios por Rol */}
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="card-title">Actividad Reciente</h3>
-                    <button className="btn-link">Ver todo</button>
+                    <h3 className="card-title">Usuarios por Rol</h3>
+                    <button className="btn-link" onClick={() => setActiveSection('users')}>
+                      Ver todos
+                    </button>
                   </div>
-                  <div className="activity-list">
-                    {recentActivity.map((activity) => {
-                      const IconComponent = getActivityIcon(activity.type);
-                      return (
-                        <div key={activity.id} className="activity-item">
-                          <div className="activity-icon">
-                            <IconComponent className="w-5 h-5" />
+                  <div className="role-distribution">
+                    {dataLoading ? (
+                      <div className="loading-state">
+                        <RefreshCw className="w-6 h-6 animate-spin" />
+                        <p>Cargando datos...</p>
+                      </div>
+                    ) : (
+                      <div className="role-stats-list">
+                        <div className="role-stat-item">
+                          <div className="role-stat-label">
+                            <Shield className="w-4 h-4 text-red-500" />
+                            <span>Administradores</span>
                           </div>
-                          <div className="activity-content">
-                            <p className="activity-action">{activity.action}</p>
-                            <p className="activity-meta">{activity.user} • {activity.time}</p>
-                          </div>
+                          <span className="role-stat-value">{stats.usersByRole.administrador || 0}</span>
                         </div>
-                      );
-                    })}
+                        <div className="role-stat-item">
+                          <div className="role-stat-label">
+                            <User className="w-4 h-4 text-blue-500" />
+                            <span>Clientes</span>
+                          </div>
+                          <span className="role-stat-value">{stats.usersByRole.cliente || 0}</span>
+                        </div>
+                        <div className="role-stat-item">
+                          <div className="role-stat-label">
+                            <Activity className="w-4 h-4 text-green-500" />
+                            <span>Lectores</span>
+                          </div>
+                          <span className="role-stat-value">{stats.usersByRole.lector || 0}</span>
+                        </div>
+                        <div className="role-stat-item">
+                          <div className="role-stat-label">
+                            <DollarSign className="w-4 h-4 text-yellow-500" />
+                            <span>Cajeros</span>
+                          </div>
+                          <span className="role-stat-value">{stats.usersByRole.cajero || 0}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -438,207 +512,17 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* Profile Section integrada en el Dashboard */}
+          {/* Profile Section - Ahora usando componente separado */}
           {activeSection === 'profile' && (
-            <div className="section-placeholder">
-              <div className="profile-section">
-                <div className="section-header">
-                  <div className="section-title">
-                    <User className="w-6 h-6 text-blue-600" />
-                    <h2>Mi Perfil</h2>
-                  </div>
-                  
-                  {!editingProfile ? (
-                    <button 
-                      className="btn-primary"
-                      onClick={handleEditProfile}
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Editar Perfil
-                    </button>
-                  ) : (
-                    <div className="profile-actions">
-                      <button 
-                        className="btn-success"
-                        onClick={handleSaveProfile}
-                      >
-                        <Save className="w-4 h-4 mr-2" />
-                        Guardar
-                      </button>
-                      <button 
-                        className="btn-secondary"
-                        onClick={handleCancelEdit}
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Cancelar
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="profile-content">
-                  {/* Avatar Section */}
-                  <div className="profile-avatar-section">
-                    <div className="profile-avatar-container">
-                      {profileData.foto ? (
-                        <img
-                          src={profileData.foto}
-                          alt="Foto de perfil"
-                          className="profile-avatar-large"
-                        />
-                      ) : (
-                        <div className="profile-avatar-large-fallback">
-                          <span className="profile-initials-large">
-                            {getUserInitials(profileData.nombres, profileData.apellidos)}
-                          </span>
-                        </div>
-                      )}
-                      {editingProfile && (
-                        <button 
-                          className="avatar-edit-btn"
-                          onClick={() => alert('Funcionalidad de cambio de foto en desarrollo')}
-                          title="Cambiar foto de perfil"
-                        >
-                          <Camera className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Profile Form */}
-                  <div className="profile-form">
-                    <div className="form-grid">
-                      <div className="form-group">
-                        <label className="form-label">
-                          <User className="w-4 h-4" />
-                          Nombres
-                        </label>
-                        {editingProfile ? (
-                          <input
-                            type="text"
-                            className="form-input"
-                            value={profileData.nombres || ''}
-                            onChange={(e) => handleProfileInputChange('nombres', e.target.value)}
-                            placeholder="Ingresa tus nombres"
-                          />
-                        ) : (
-                          <div className="form-value">{profileData.nombres || 'No especificado'}</div>
-                        )}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          <User className="w-4 h-4" />
-                          Apellidos
-                        </label>
-                        {editingProfile ? (
-                          <input
-                            type="text"
-                            className="form-input"
-                            value={profileData.apellidos || ''}
-                            onChange={(e) => handleProfileInputChange('apellidos', e.target.value)}
-                            placeholder="Ingresa tus apellidos"
-                          />
-                        ) : (
-                          <div className="form-value">{profileData.apellidos || 'No especificado'}</div>
-                        )}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          <Mail className="w-4 h-4" />
-                          Correo Electrónico
-                        </label>
-                        {editingProfile ? (
-                          <input
-                            type="email"
-                            className="form-input"
-                            value={profileData.email || ''}
-                            onChange={(e) => handleProfileInputChange('email', e.target.value)}
-                            placeholder="email@ejemplo.com"
-                          />
-                        ) : (
-                          <div className="form-value">{profileData.email || 'No especificado'}</div>
-                        )}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          <Phone className="w-4 h-4" />
-                          Teléfono
-                        </label>
-                        {editingProfile ? (
-                          <input
-                            type="tel"
-                            className="form-input"
-                            value={profileData.telefono || ''}
-                            onChange={(e) => handleProfileInputChange('telefono', e.target.value)}
-                            placeholder="Número de teléfono"
-                          />
-                        ) : (
-                          <div className="form-value">{profileData.telefono || 'No especificado'}</div>
-                        )}
-                      </div>
-
-                      <div className="form-group form-group-full">
-                        <label className="form-label">
-                          <MapPin className="w-4 h-4" />
-                          Dirección
-                        </label>
-                        {editingProfile ? (
-                          <textarea
-                            className="form-textarea"
-                            value={profileData.direccion || ''}
-                            onChange={(e) => handleProfileInputChange('direccion', e.target.value)}
-                            rows="3"
-                            placeholder="Dirección completa"
-                          />
-                        ) : (
-                          <div className="form-value">{profileData.direccion || 'No especificado'}</div>
-                        )}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          <Shield className="w-4 h-4" />
-                          Rol del Sistema
-                        </label>
-                        <div className="form-value">
-                          <span className={`role-badge ${profileData.rol?.toLowerCase()}`}>
-                            {profileData.rol || 'Sin rol'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          <Calendar className="w-4 h-4" />
-                          Fecha de Registro
-                        </label>
-                        <div className="form-value">
-                          {profileData.fecha_registro ? 
-                            new Date(profileData.fecha_registro).toLocaleDateString('es-ES', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            }) : 
-                            'No disponible'
-                          }
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ProfileSection 
+              user={user}  // pasar datos del usuario
+              onUpdateProfile={handleUpdateProfile} // función para actualizar perfil
+            />
           )}
 
           {/* Secciones usando componentes separados */}
           {activeSection === 'users' && <UsersSection />}
-
           {activeSection === 'invoices' && <InvoicesSection />}
-
-          
 
           {activeSection === 'payments' && (
             <div className="section-placeholder">

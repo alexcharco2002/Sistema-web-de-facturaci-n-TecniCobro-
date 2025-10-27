@@ -8,7 +8,7 @@ class UsuarioSistema(Base):
     __table_args__ = {"schema": "usuarios"}  # <-- aquí va el esquema
     
     # Campos originales
-    cod_usuario_sistema = Column(Integer, primary_key=True, index=True)
+    id_usuario_sistema = Column(Integer, primary_key=True, index=True)
     usuario = Column(String(50), unique=True, nullable=False, index=True)
     clave = Column(String(255), nullable=False)
     nombres = Column(String(100), nullable=False)
@@ -36,7 +36,7 @@ class UsuarioSistema(Base):
     def to_dict(self):
         """Convierte el objeto a diccionario"""
         return {
-            "cod_usuario_sistema": self.cod_usuario_sistema,
+            "id_usuario_sistema": self.id_usuario_sistema,
             "usuario": self.usuario,
             "nombres": self.nombres,
             "apellidos": self.apellidos,

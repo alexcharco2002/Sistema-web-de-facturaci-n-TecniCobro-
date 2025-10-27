@@ -217,10 +217,15 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
             "data": {
                 "token": access_token,
                 "user": {
-                    "cod_usuario_sistema": db_user.cod_usuario_sistema,
+                    "id_usuario_sistema": db_user.id_usuario_sistema,
                     "usuario": db_user.usuario,
                     "nombres": db_user.nombres,
                     "apellidos": db_user.apellidos,
+                    "sexo": db_user.sexo,
+                    "cedula": db_user.cedula,
+                    "telefono": getattr(db_user, 'telefono', None),
+                    "direccion": getattr(db_user, 'direccion', None),
+                    "fecha_nac" : db_user.fecha_nac.isoformat() if db_user.fecha_nac else None,
                     "nombre_completo": f"{db_user.nombres} {db_user.apellidos}",
                     "rol": db_user.rol,
                     "email": db_user.email,
@@ -270,10 +275,15 @@ def verify_session(payload: dict = Depends(verify_token), db: Session = Depends(
     foto_url = process_user_photo(db_user.foto) if hasattr(db_user, 'foto') and db_user.foto else None
     
     return {
-        "cod_usuario_sistema": db_user.cod_usuario_sistema,
+        "id_usuario_sistema": db_user.id_usuario_sistema,
         "usuario": db_user.usuario,
         "nombres": db_user.nombres,
         "apellidos": db_user.apellidos,
+        "sexo": db_user.sexo,
+        "fecha_nac": db_user.fecha_nac.isoformat() if db_user.fecha_nac else None,
+        "cedula": db_user.cedula,
+        "telefono": getattr(db_user, 'telefono', None),
+        "direccion": getattr(db_user, 'direccion', None),
         "nombre_completo": f"{db_user.nombres} {db_user.apellidos}",
         "email": db_user.email,
         "rol": db_user.rol,
@@ -300,10 +310,12 @@ def get_profile(payload: dict = Depends(verify_token), db: Session = Depends(get
     foto_url = process_user_photo(db_user.foto) if hasattr(db_user, 'foto') and db_user.foto else None
     
     return {
-        "cod_usuario_sistema": db_user.cod_usuario_sistema,
+        "id_usuario_sistema": db_user.id_usuario_sistema,
         "usuario": db_user.usuario,
         "nombres": db_user.nombres,
         "apellidos": db_user.apellidos,
+        "sexo": db_user.sexo,
+        "fecha_nac": db_user.fecha_nac.isoformat() if db_user.fecha_nac else None,
         "nombre_completo": f"{db_user.nombres} {db_user.apellidos}",
         "cedula": db_user.cedula,
         "email": db_user.email,
@@ -347,7 +359,7 @@ def unlock_user(
         )
     
     user = db.query(UsuarioSistema).filter(
-        UsuarioSistema.cod_usuario_sistema == user_id
+        UsuarioSistema.id_usuario_sistema == user_id
     ).first()
     
     if not user:
@@ -446,7 +458,7 @@ def get_blocked_users(
             tiempo_restante = int((user.bloqueado_hasta - ahora).total_seconds() / 60)
         
         return {
-            "id": user.cod_usuario_sistema,
+            "id": user.id_usuario_sistema,
             "usuario": user.usuario,
             "nombre_completo": f"{user.nombres} {user.apellidos}",
             "email": user.email,

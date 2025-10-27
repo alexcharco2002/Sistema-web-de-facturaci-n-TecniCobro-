@@ -253,7 +253,7 @@ class UserResponse(BaseModel):
     rol: str
     activo: bool
     fecha_registro: Optional[str] = None
-    ultimo_acceso: Optional[str] = None
+    ultimo_acceso: Optional[datetime] = None
     foto: Optional[str] = None
     
     class Config:

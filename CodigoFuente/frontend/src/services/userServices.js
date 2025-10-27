@@ -1,4 +1,5 @@
 /**
+ * src/services/userServices.js
  * Servicio de Gestión de Usuarios
  * Maneja todas las operaciones CRUD de usuarios con el backend
  */
@@ -17,7 +18,7 @@ const API_CONFIG = {
 
 class UsersService {
   /**
-   * Realizar petición HTTP con configuración común
+   * Realizar petición HTTPS con configuración común
    */
   async makeRequest(endpoint, options = {}) {
     const url = `${API_CONFIG.baseURL}${endpoint}`;
@@ -198,6 +199,9 @@ class UsersService {
       if (userData.usuario) updateData.usuario = userData.usuario.trim().toLowerCase();
       if (userData.nombres) updateData.nombres = userData.nombres.trim();
       if (userData.apellidos) updateData.apellidos = userData.apellidos.trim();
+      if (userData.sexo) updateData.sexo = userData.sexo.toUpperCase();
+      // no permitir null
+      if (userData.fecha_nac) updateData.fecha_nac = userData.fecha_nac;
       if (userData.cedula) updateData.cedula = userData.cedula.trim();
       if (userData.email) updateData.email = userData.email.trim().toLowerCase();
       if (userData.telefono !== undefined) updateData.telefono = userData.telefono?.trim() || null;
@@ -400,6 +404,15 @@ class UsersService {
 
       if (userData.sexo && !['M', 'F'].includes(userData.sexo.toUpperCase())) {
         throw new Error('El sexo debe ser M o F');
+      }
+
+      // validar fehca de nacimiento si está presente y no sea mayor a la fecha actual
+      if (userData.fecha_nac) {
+        const fechaNac = new Date(userData.fecha_nac);
+        const hoy = new Date();
+        if (fechaNac > hoy) {
+          throw new Error('La fecha de nacimiento no puede ser mayor a la fecha actual');
+        }
       }
   }
 

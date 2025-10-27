@@ -17,6 +17,7 @@ from schemas.user import (
 )
 from security.jwt import verify_token
 from security.password import hash_password, verify_password
+from utils.audit_logger import registrar_auditoria
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -43,7 +44,7 @@ def user_to_response(user: UsuarioSistema) -> dict:
     foto_url = process_user_photo(user.foto) if user.foto else None
     
     return {
-        "id": user.cod_usuario_sistema,
+        "id": user.id_usuario_sistema,
         "usuario": user.usuario,
         "nombres": user.nombres,
         "apellidos": user.apellidos,
@@ -127,19 +128,19 @@ def get_user(
     """
     # Verificar permisos: admin o el mismo usuario
     if payload.get("rol") != "administrador":
-        # Obtener el cod_usuario_sistema del usuario actual
+        # Obtener el id_usuario_sistema del usuario actual
         current_user = db.query(UsuarioSistema).filter(
             UsuarioSistema.usuario == payload["sub"]
         ).first()
         
-        if not current_user or current_user.cod_usuario_sistema != user_id:
+        if not current_user or current_user.id_usuario_sistema != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para ver este usuario"
             )
     
     user = db.query(UsuarioSistema).filter(
-        UsuarioSistema.cod_usuario_sistema == user_id
+        UsuarioSistema.id_usuario_sistema == user_id
     ).first()
     
     if not user:
@@ -273,7 +274,18 @@ def create_user(
         db.commit()
         db.refresh(new_user)
 
+        registrar_auditoria(
+        db=db,
+        accion="CREATE",
+        descripcion=f"Usuario '{new_user.usuario}' creado por '{payload['sub']}'",
+        id_usuario=db.query(UsuarioSistema)
+                    .filter(UsuarioSistema.usuario == payload['sub'])
+                    .first().id_usuario_sistema
+        )
+        
         print(f"✅ Usuario creado exitosamente: {username}")
+        # 📌 Registrar auditoría
+        
 
         # ✅ Devolver respuesta con datos generados
         response_data = user_to_response(new_user)
@@ -307,7 +319,7 @@ def update_user(
     """
     # Obtener usuario a actualizar
     user = db.query(UsuarioSistema).filter(
-        UsuarioSistema.cod_usuario_sistema == user_id
+        UsuarioSistema.id_usuario_sistema == user_id
     ).first()
     
     if not user:
@@ -322,7 +334,7 @@ def update_user(
             UsuarioSistema.usuario == payload["sub"]
         ).first()
         
-        if not current_user or current_user.cod_usuario_sistema != user_id:
+        if not current_user or current_user.id_usuario_sistema != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para actualizar este usuario"
@@ -339,7 +351,7 @@ def update_user(
     if user_data.usuario and user_data.usuario != user.usuario:
         existing = db.query(UsuarioSistema).filter(
             UsuarioSistema.usuario == user_data.usuario,
-            UsuarioSistema.cod_usuario_sistema != user_id
+            UsuarioSistema.id_usuario_sistema != user_id
         ).first()
         if existing:
             raise HTTPException(
@@ -350,7 +362,7 @@ def update_user(
     if user_data.email and user_data.email != user.email:
         existing = db.query(UsuarioSistema).filter(
             UsuarioSistema.email == user_data.email,
-            UsuarioSistema.cod_usuario_sistema != user_id
+            UsuarioSistema.id_usuario_sistema != user_id
         ).first()
         if existing:
             raise HTTPException(
@@ -361,7 +373,7 @@ def update_user(
     if user_data.cedula and user_data.cedula != user.cedula:
         existing = db.query(UsuarioSistema).filter(
             UsuarioSistema.cedula == user_data.cedula,
-            UsuarioSistema.cod_usuario_sistema != user_id
+            UsuarioSistema.id_usuario_sistema != user_id
         ).first()
         if existing:
             raise HTTPException(
@@ -386,6 +398,15 @@ def update_user(
         db.commit()
         db.refresh(user)
         
+        # 📌 Registrar auditoría
+        registrar_auditoria(
+            db=db,
+            accion="UPDATE",
+            descripcion=f"Usuario '{user.usuario}' actualizado por '{payload['sub']}'",
+            id_usuario=db.query(UsuarioSistema)
+                        .filter(UsuarioSistema.usuario == payload['sub'])
+                        .first().id_usuario_sistema
+        )
         return user_to_response(user)
     
     except Exception as e:
@@ -422,7 +443,7 @@ def delete_user(
         UsuarioSistema.usuario == payload["sub"]
     ).first()
     
-    if current_user and current_user.cod_usuario_sistema == user_id:
+    if current_user and current_user.id_usuario_sistema == user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No puedes eliminar tu propio usuario"
@@ -430,7 +451,7 @@ def delete_user(
     
     # Obtener usuario a eliminar
     user = db.query(UsuarioSistema).filter(
-        UsuarioSistema.cod_usuario_sistema == user_id
+        UsuarioSistema.id_usuario_sistema == user_id
     ).first()
     
     if not user:
@@ -443,6 +464,15 @@ def delete_user(
         db.delete(user)
         db.commit()
         
+        # 📌 Registrar auditoría
+        registrar_auditoria(
+            db=db,
+            accion="DELETE",
+            descripcion=f"Usuario '{user.usuario}' eliminado por '{payload['sub']}'",
+            id_usuario=db.query(UsuarioSistema)
+                        .filter(UsuarioSistema.usuario == payload['sub'])
+                        .first().id_usuario_sistema
+        )
         return {
             "success": True,
             "message": "Usuario eliminado exitosamente"
@@ -477,7 +507,7 @@ def toggle_user_status(
         )
     
     user = db.query(UsuarioSistema).filter(
-        UsuarioSistema.cod_usuario_sistema == user_id
+        UsuarioSistema.id_usuario_sistema == user_id
     ).first()
     
     if not user:
@@ -531,7 +561,7 @@ def change_user_password(
     ).first()
     
     # Verificar que sea el mismo usuario o admin
-    if payload.get("rol") != "administrador" and (not current_user or current_user.cod_usuario_sistema != user_id):
+    if payload.get("rol") != "administrador" and (not current_user or current_user.id_usuario_sistema != user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para cambiar esta contraseña"
@@ -539,7 +569,7 @@ def change_user_password(
     
     # Obtener usuario a actualizar
     user = db.query(UsuarioSistema).filter(
-        UsuarioSistema.cod_usuario_sistema == user_id
+        UsuarioSistema.id_usuario_sistema == user_id
     ).first()
     
     if not user:
@@ -602,7 +632,7 @@ async def upload_user_photo(
             UsuarioSistema.usuario == payload["sub"]
         ).first()
         
-        if not current_user or current_user.cod_usuario_sistema != user_id:
+        if not current_user or current_user.id_usuario_sistema != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para actualizar esta foto"
@@ -610,7 +640,7 @@ async def upload_user_photo(
     
     # Obtener usuario
     user = db.query(UsuarioSistema).filter(
-        UsuarioSistema.cod_usuario_sistema == user_id
+        UsuarioSistema.id_usuario_sistema == user_id
     ).first()
     
     if not user:
@@ -674,7 +704,7 @@ def unlock_user_account(
     
     # Obtener usuario a desbloquear
     user = db.query(UsuarioSistema).filter(
-        UsuarioSistema.cod_usuario_sistema == user_id
+        UsuarioSistema.id_usuario_sistema == user_id
     ).first()
     
     if not user:
@@ -744,14 +774,14 @@ def get_user_lock_status(
             UsuarioSistema.usuario == payload["sub"]
         ).first()
         
-        if not current_user or current_user.cod_usuario_sistema != user_id:
+        if not current_user or current_user.id_usuario_sistema != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para ver este estado"
             )
     
     user = db.query(UsuarioSistema).filter(
-        UsuarioSistema.cod_usuario_sistema == user_id
+        UsuarioSistema.id_usuario_sistema == user_id
     ).first()
     
     if not user:
@@ -834,7 +864,7 @@ def get_blocked_users(
             tiempo_restante = int((user.bloqueado_hasta - ahora).total_seconds() / 60)
         
         return {
-            "id": user.cod_usuario_sistema,
+            "id": user.id_usuario_sistema,
             "usuario": user.usuario,
             "nombre_completo": f"{user.nombres} {user.apellidos}",
             "email": user.email,

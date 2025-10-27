@@ -30,6 +30,8 @@ const UsersSection = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm); // Estado para búsqueda con debounce
+
   const [filterRole, setFilterRole] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('create');
@@ -63,7 +65,7 @@ const UsersSection = () => {
     
     try {
       const result = await usersService.getUsers({
-        search: searchTerm,
+        search: debouncedSearchTerm,
         rol: filterRole === 'all' ? undefined : filterRole
       });
 
@@ -80,7 +82,7 @@ const UsersSection = () => {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, filterRole]);
+  }, [ filterRole, debouncedSearchTerm]);
 
   // ✅ CARGAR USUARIOS AL MONTAR EL COMPONENTE
   useEffect(() => {
@@ -90,12 +92,16 @@ const UsersSection = () => {
 
   // Recargar cuando cambien los filtros
   useEffect(() => {
-  const delaySearch = setTimeout(() => {
-    fetchUsers();
-  }, 500);
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 700);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
-  return () => clearTimeout(delaySearch);
-}, [searchTerm, filterRole, fetchUsers]);
+  useEffect(() => {
+    fetchUsers();
+  }, [debouncedSearchTerm, filterRole, fetchUsers]);
+
 
 
   // Filtrar usuarios localmente (también se puede filtrar en el servidor)

@@ -1,9 +1,11 @@
 // src/components/UserProfile.js
+// Componente para mostrar el perfil del usuario con un dropdown para opciones como ver perfil, configuración y cerrar sesión
+
 import React, { useState, useRef, useEffect } from 'react';
 import { LogOut, ChevronDown, User, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const UserProfile = ({ user, onLogout }) => {
+const UserProfile = ({ user, onLogout, onViewProfile }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -45,13 +47,14 @@ const UserProfile = ({ user, onLogout }) => {
     }
   };
 
-  const [ setActiveSidebar] = useState('overview'); // inicio en Panel General
+  
 
-  // Navegación a perfil
-  const handleViewProfile = () => {
-    setShowDropdown(false);       // cierra el dropdown
-    setActiveSidebar('profile');  // activa la sección de perfil en el sidebar
+
+   const handleViewProfile = () => {
+    setShowDropdown(false);
+    if (onViewProfile) onViewProfile(); // 🔥 notifica al AdminDashboard
   };
+
 
 
   // Navegación a configuración
