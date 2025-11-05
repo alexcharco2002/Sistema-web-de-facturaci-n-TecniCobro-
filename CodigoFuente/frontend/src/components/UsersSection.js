@@ -1,45 +1,28 @@
+
 // src/components/users/UsersSection.js
-// MODULO DE USUARIOS -- Componente para la gestión de usuarios: listado, creación, edición, eliminación
-import React, { useState, useEffect , useCallback} from 'react';
-// para impoartar stilo css
+// MODULO DE USUARIOS - Actualizado para arquitectura con roles separados
+import React, { useState, useEffect, useCallback } from 'react';
 import './styleModeUser.css';
 import usersService from '../services/userServices';
 
 import { 
-  Users, 
-  Plus, 
-  Search, 
-  Edit,
-  Trash2,
-  Eye,
-  UserCheck,
-  UserX,
-  Mail,
-  Phone,
-  MapPin,
-  Calendar,
-  X,
-  Save,
-  RefreshCw,
-  Key,
-  Image as ImageIcon,
-  AlertCircle
+  Users, Plus, Search, Edit, Trash2, Eye, UserCheck, UserX,
+  Mail, Phone, MapPin, Calendar, X, Save, RefreshCw, Key,
+  Image as ImageIcon, AlertCircle
 } from 'lucide-react';
 
 const UsersSection = () => {
   const [users, setUsers] = useState([]);
+  const [roles, setRoles] = useState([]); // 🆕 Lista de roles desde t_roles
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm); // Estado para búsqueda con debounce
-
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
   const [filterRole, setFilterRole] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('create');
   const [selectedUser, setSelectedUser] = useState(null);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
-    usuario: '',
-    clave: '',
     nombres: '',
     apellidos: '',
     sexo: '',
@@ -48,7 +31,7 @@ const UsersSection = () => {
     email: '',
     telefono: '',
     direccion: '',
-    rol: 'cliente',
+    id_rol: null, // 🔑 Ahora usamos id_rol en lugar de rol
     activo: true
   });
   const [passwordData, setPasswordData] = useState({
@@ -58,7 +41,25 @@ const UsersSection = () => {
   });
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // Función para cargar usuarios del servidor
+  // 🆕 Cargar roles al montar el componente
+  useEffect(() => {
+    loadRoles();
+  }, []);
+
+  const loadRoles = async () => {
+    try {
+      const result = await usersService.getRoles();
+      if (result.success) {
+        setRoles(result.data);
+        console.log('✅ Roles cargados:', result.data);
+      } else {
+        console.error('Error cargando roles:', result.message);
+      }
+    } catch (error) {
+      console.error('Error al cargar roles:', error);
+    }
+  };
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -66,7 +67,7 @@ const UsersSection = () => {
     try {
       const result = await usersService.getUsers({
         search: debouncedSearchTerm,
-        rol: filterRole === 'all' ? undefined : filterRole
+        id_rol: filterRole === 'all' ? undefined : filterRole // 🔑 Filtrar por id_rol
       });
 
       if (result.success) {
@@ -82,15 +83,13 @@ const UsersSection = () => {
     } finally {
       setLoading(false);
     }
-  }, [ filterRole, debouncedSearchTerm]);
+  }, [filterRole, debouncedSearchTerm]);
 
-  // ✅ CARGAR USUARIOS AL MONTAR EL COMPONENTE
   useEffect(() => {
     console.log('🔄 Componente montado, cargando usuarios...');
     fetchUsers();
-  }, [fetchUsers]); // Se ejecuta solo una vez al montar
+  }, [fetchUsers]);
 
-  // Recargar cuando cambien los filtros
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
@@ -102,21 +101,17 @@ const UsersSection = () => {
     fetchUsers();
   }, [debouncedSearchTerm, filterRole, fetchUsers]);
 
-
-
-  // Filtrar usuarios localmente (también se puede filtrar en el servidor)
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       user.nombres.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.apellidos.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesRole = filterRole === 'all' || user.rol === filterRole;
+    const matchesRole = filterRole === 'all' || user.id_rol === parseInt(filterRole);
     
     return matchesSearch && matchesRole;
   });
 
-  // Handlers para modal
   const openModal = (type, user = null) => {
     setModalType(type);
     setSelectedUser(user);
@@ -124,8 +119,6 @@ const UsersSection = () => {
     
     if (type === 'create') {
       setFormData({
-        usuario: '',
-        clave: '',
         nombres: '',
         apellidos: '',
         sexo: '',
@@ -134,12 +127,11 @@ const UsersSection = () => {
         email: '',
         telefono: '',
         direccion: '',
-        rol: 'cliente',
+        id_rol: roles.length > 0 ? roles[0].id_rol : null, // 🔑 Seleccionar primer rol por defecto
         activo: true
       });
     } else if (type === 'edit' && user) {
       setFormData({
-        usuario: user.usuario,
         nombres: user.nombres,
         apellidos: user.apellidos,
         sexo: user.sexo || '',
@@ -148,7 +140,7 @@ const UsersSection = () => {
         email: user.email,
         telefono: user.telefono || '',
         direccion: user.direccion || '',
-        rol: user.rol,
+        id_rol: user.id_rol, // 🔑 ID del rol
         activo: user.activo
       });
     } else if (type === 'password' && user) {
@@ -171,7 +163,6 @@ const UsersSection = () => {
     setSelectedFile(null);
   };
 
-  // Handler para crear/editar usuario
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -180,39 +171,29 @@ const UsersSection = () => {
       let result;
 
       if (modalType === "create") {
-        // En creación ya no pedimos contraseña manual
-        // El backend genera usuario y contraseña automáticamente
-        const { clave, usuario, ...dataToSend } = formData; // eliminar campos innecesarios
-
-        result = await usersService.createUser(dataToSend);
+        // ✅ Enviar id_rol en lugar de rol
+        result = await usersService.createUser(formData);
 
         if (result.success) {
-          // Si el backend devuelve la contraseña generada, la mostramos
           const passwordGenerada = result.data?.contraseña_generada;
           const nombreUsuario = result.data?.usuario;
 
-          await fetchUsers(); // recargar lista
+          await fetchUsers();
           closeModal();
 
-          // Mostrar un mensaje informativo al admin
           alert(
             `✅ Usuario creado exitosamente.\n\n` +
             `👤 Usuario: ${nombreUsuario}\n` +
-            (passwordGenerada
-              ? `🔑 Contraseña generada: ${passwordGenerada}`
-              : "")
+            (passwordGenerada ? `🔑 Contraseña generada: ${passwordGenerada}` : "")
           );
         } else {
           setError(result.message || "Error al crear el usuario");
         }
 
       } else if (modalType === "edit") {
-        // En edición: solo enviamos la clave si fue cambiada
-        const updateData = { ...formData };
-        if (!updateData.clave) delete updateData.clave;
-
-        result = await usersService.updateUser(selectedUser.id, updateData);
-
+        // ✅ Actualizar con id_rol
+        result = await usersService.updateUser(selectedUser.id, formData);
+        
         if (result.success) {
           alert("✅ Cambios guardados correctamente");
           await fetchUsers();
@@ -228,8 +209,6 @@ const UsersSection = () => {
     }
   };
 
-
-  // Handler para cambiar contraseña
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setError(null);
@@ -261,7 +240,6 @@ const UsersSection = () => {
     }
   };
 
-  // Handler para subir foto
   const handleUploadPhoto = async (e) => {
     e.preventDefault();
     setError(null);
@@ -276,7 +254,7 @@ const UsersSection = () => {
 
       if (result.success) {
         alert(result.message);
-        await fetchUsers(); // Recargar para ver la foto actualizada
+        await fetchUsers();
         closeModal();
       } else {
         setError(result.message);
@@ -286,7 +264,6 @@ const UsersSection = () => {
     }
   };
 
-  // Handler para eliminar usuario
   const handleDelete = async (userId) => {
     if (window.confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
       try {
@@ -304,13 +281,12 @@ const UsersSection = () => {
     }
   };
 
-  // Handler para toggle activo/inactivo
   const toggleUserStatus = async (userId) => {
     try {
       const result = await usersService.toggleUserStatus(userId);
       
       if (result.success) {
-        await fetchUsers(); // Recargar lista
+        await fetchUsers();
       } else {
         alert('Error: ' + result.message);
       }
@@ -319,16 +295,27 @@ const UsersSection = () => {
     }
   };
 
-  const getRoleBadge = (rol) => {
+  // 🆕 Función auxiliar para obtener el nombre del rol
+  const getRoleName = (user) => {
+    if (user.rol && user.rol.nombre_rol) {
+      return user.rol.nombre_rol;
+    }
+    return 'Sin rol';
+  };
+
+  const getRoleBadge = (user) => {
+    const roleName = getRoleName(user).toLowerCase();
+    
     const roleClasses = {
-      admin: 'bg-red-100 text-red-800',
+      administrador: 'bg-red-100 text-red-800',
       cliente: 'bg-blue-100 text-blue-800',
-      operador: 'bg-green-100 text-green-800'
+      lector: 'bg-green-100 text-green-800',
+      cajero: 'bg-purple-100 text-purple-800'
     };
     
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleClasses[rol] || 'bg-gray-100 text-gray-800'}`}>
-        {rol.charAt(0).toUpperCase() + rol.slice(1)}
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleClasses[roleName] || 'bg-gray-100 text-gray-800'}`}>
+        {roleName.charAt(0).toUpperCase() + roleName.slice(1)}
       </span>
     );
   };
@@ -359,7 +346,6 @@ const UsersSection = () => {
 
   return (
     <div className="users-section">
-      {/* Header */}
       <div className="section-header">
         <div className="section-title">
           <Users className="w-6 h-6 text-blue-600" />
@@ -374,7 +360,6 @@ const UsersSection = () => {
         </button>
       </div>
 
-      {/* Filtros y Búsqueda */}
       <div className="filters-section">
         <div className="search-container">
           <Search className="search-icon" />
@@ -387,15 +372,18 @@ const UsersSection = () => {
           />
         </div>
         
+        {/* 🆕 Filtro dinámico de roles desde t_roles */}
         <select 
           className="filter-select"
           value={filterRole}
           onChange={(e) => setFilterRole(e.target.value)}
         >
           <option value="all">Todos los roles</option>
-          <option value="admin">Administradores</option>
-          <option value="cliente">Clientes</option>
-          <option value="operador">Operadores</option>
+          {roles.map(rol => (
+            <option key={rol.id_rol} value={rol.id_rol}>
+              {rol.nombre_rol}
+            </option>
+          ))}
         </select>
 
         <button 
@@ -407,7 +395,6 @@ const UsersSection = () => {
         </button>
       </div>
 
-      {/* Stats */}
       <div className="users-stats">
         <div className="stat-item">
           <Users className="stat-icon text-blue-600" />
@@ -432,23 +419,30 @@ const UsersSection = () => {
         </div>
       </div>
 
-      {/* Lista de Usuarios */}
       <div className="users-grid">
         {filteredUsers.map(user => (
           <div key={user.id} className={`user-card ${!user.activo ? 'inactive' : ''}`}>
             <div className="user-card-header">
               <div className="user-info">
-                {user.foto && (
-                  <img 
-                    src={user.foto} 
-                    alt={user.nombres} 
-                    className="w-12 h-12 rounded-full object-cover mr-3"
-                  />
+                {user.foto ? (
+                  <div className="user-avatar">
+                    <img
+                      src={user.foto}
+                      alt={user.nombres}
+                      className="user-avatar-img"
+                    />
+                  </div>
+                ) : (
+                  <div className="user-avatar user-avatar-empty">
+                    <span>
+                      {`${user.nombres?.[0]?.toUpperCase() || ''}${user.apellidos?.[0]?.toUpperCase() || ''}`}
+                    </span>
+                  </div>
                 )}
                 <div>
                   <h3 className="user-name">{user.nombres} {user.apellidos}</h3>
                   <div className="user-meta">
-                    {getRoleBadge(user.rol)}
+                    {getRoleBadge(user)}
                     <span className={`status-badge ${user.activo ? 'active' : 'inactive'}`}>
                       {user.activo ? 'Activo' : 'Inactivo'}
                     </span>
@@ -457,13 +451,11 @@ const UsersSection = () => {
               </div>
               
               <div className="user-actions">
-                
                 <button 
                   className="action-btn view"
                   onClick={() => openModal('view', user)}
                   title="Ver detalles"
                 >
-                  
                   <Eye className="w-4 h-4 icon-view" />
                 </button>
                 <button 
@@ -550,7 +542,7 @@ const UsersSection = () => {
         </div>
       )}
 
-      {/* Modal */}
+      {/* MODALES */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal">
@@ -562,10 +554,7 @@ const UsersSection = () => {
                 {modalType === 'password' && 'Cambiar Contraseña'}
                 {modalType === 'photo' && 'Cambiar Foto de Perfil'}
               </h3>
-              <button 
-                className="modal-close"
-                onClick={closeModal}
-              >
+              <button className="modal-close" onClick={closeModal}>
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -580,16 +569,20 @@ const UsersSection = () => {
 
               {/* MODAL DE VISTA */}
               {modalType === 'view' && selectedUser && (
-                <div className="user-details">
-                  {selectedUser.foto && (
-                    <div className="text-center mb-4">
+                <div className="user-details ">
+                  <div className="user-photo-container mb-5">
+                    {selectedUser.foto ? (
                       <img 
                         src={selectedUser.foto} 
                         alt={selectedUser.nombres}
-                        className="w-32 h-32 rounded-full object-cover mx-auto"
+                        className="user-photo-img"
                       />
-                    </div>
-                  )}
+                    ) : (
+                      <div className="user-photo-placeholder">
+                        {`${selectedUser.nombres?.[0]?.toUpperCase() || ''}${selectedUser.apellidos?.[0]?.toUpperCase() || ''}`}
+                      </div>
+                    )}
+                  </div>
                   <div className="detail-group">
                     <label>Usuario:</label>
                     <p>{selectedUser.usuario}</p>
@@ -605,11 +598,8 @@ const UsersSection = () => {
                   <div className="detail-group">
                     <label>Sexo:</label>
                     <p>
-                      {selectedUser.sexo === "M"
-                        ? "Masculino"
-                        : selectedUser.sexo === "F"
-                        ? "Femenino"
-                        : "No especificado"}
+                      {selectedUser.sexo === "M" ? "Masculino" :
+                       selectedUser.sexo === "F" ? "Femenino" : "Otro"}
                     </p>
                   </div>
                   <div className="detail-group">
@@ -634,7 +624,7 @@ const UsersSection = () => {
                   )}
                   <div className="detail-group">
                     <label>Rol:</label>
-                    <p>{getRoleBadge(selectedUser.rol)}</p>
+                    <p>{getRoleBadge(selectedUser)}</p>
                   </div>
                   <div className="detail-group">
                     <label>Estado:</label>
@@ -646,42 +636,16 @@ const UsersSection = () => {
               )}
 
               {/* MODAL DE CREACIÓN/EDICIÓN */}
-              {/* MODAL DE CREACIÓN/EDICIÓN */}
               {(modalType === 'create' || modalType === 'edit') && (
                 <form onSubmit={handleSubmit} className="user-form">
                   <div className="form-grid">
-
-                    {/* 🔒 Ocultar Usuario y Contraseña en creación */}
-                    {modalType === 'edit' && (
-                      <>
-                        <div className="form-group">
-                          <label>Usuario *</label>
-                          <input
-                            type="text"
-                            required
-                            value={formData.usuario}
-                            onChange={(e) =>
-                              setFormData({ ...formData, usuario: e.target.value })
-                            }
-                            placeholder="Nombre de usuario"
-                            disabled={modalType === 'edit'}
-                          />
-                        </div>
-
-                        
-                      </>
-                    )}
-
-                    {/* 🧍 Datos personales */}
                     <div className="form-group">
                       <label>Nombres *</label>
                       <input
                         type="text"
                         required
                         value={formData.nombres}
-                        onChange={(e) =>
-                          setFormData({ ...formData, nombres: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, nombres: e.target.value })}
                         placeholder="Nombres del usuario"
                       />
                     </div>
@@ -692,9 +656,7 @@ const UsersSection = () => {
                         type="text"
                         required
                         value={formData.apellidos}
-                        onChange={(e) =>
-                          setFormData({ ...formData, apellidos: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, apellidos: e.target.value })}
                         placeholder="Apellidos del usuario"
                       />
                     </div>
@@ -704,13 +666,12 @@ const UsersSection = () => {
                       <select
                         required
                         value={formData.sexo}
-                        onChange={(e) =>
-                          setFormData({ ...formData, sexo: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
                       >
                         <option value="">Seleccione una opción</option>
                         <option value="M">Masculino</option>
                         <option value="F">Femenino</option>
+                        <option value="O">Otro</option>
                       </select>
                     </div>
 
@@ -720,9 +681,7 @@ const UsersSection = () => {
                         type="date"
                         required
                         value={formData.fecha_nac}
-                        onChange={(e) =>
-                          setFormData({ ...formData, fecha_nac: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, fecha_nac: e.target.value })}
                       />
                     </div>
 
@@ -732,9 +691,7 @@ const UsersSection = () => {
                         type="text"
                         required
                         value={formData.cedula}
-                        onChange={(e) =>
-                          setFormData({ ...formData, cedula: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, cedula: e.target.value })}
                         placeholder="Número de cédula"
                       />
                     </div>
@@ -745,9 +702,7 @@ const UsersSection = () => {
                         type="email"
                         required
                         value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="email@ejemplo.com"
                       />
                     </div>
@@ -757,9 +712,7 @@ const UsersSection = () => {
                       <input
                         type="tel"
                         value={formData.telefono}
-                        onChange={(e) =>
-                          setFormData({ ...formData, telefono: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
                         placeholder="Número de teléfono"
                       />
                     </div>
@@ -768,27 +721,26 @@ const UsersSection = () => {
                       <label>Dirección</label>
                       <textarea
                         value={formData.direccion}
-                        onChange={(e) =>
-                          setFormData({ ...formData, direccion: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
                         placeholder="Dirección completa"
                         rows="3"
                       />
                     </div>
 
+                    {/* 🆕 Select dinámico de roles desde t_roles */}
                     <div className="form-group">
                       <label>Rol *</label>
                       <select
                         required
-                        value={formData.rol}
-                        onChange={(e) =>
-                          setFormData({ ...formData, rol: e.target.value })
-                        }
+                        value={formData.id_rol || ''}
+                        onChange={(e) => setFormData({ ...formData, id_rol: parseInt(e.target.value) })}
                       >
-                        <option value="cliente">Cliente</option>
-                        <option value="lector">Lector</option>
-                        <option value="cajero">Cajero</option>
-                        <option value="administrador">Administrador</option>
+                        <option value="">Seleccione un rol</option>
+                        {roles.map(rol => (
+                          <option key={rol.id_rol} value={rol.id_rol}>
+                            {rol.nombre_rol}
+                          </option>
+                        ))}
                       </select>
                     </div>
 
@@ -796,9 +748,7 @@ const UsersSection = () => {
                       <label>Estado</label>
                       <select
                         value={formData.activo}
-                        onChange={(e) =>
-                          setFormData({ ...formData, activo: e.target.value === "true" })
-                        }
+                        onChange={(e) => setFormData({ ...formData, activo: e.target.value === "true" })}
                       >
                         <option value="true">Activo</option>
                         <option value="false">Inactivo</option>
@@ -817,7 +767,6 @@ const UsersSection = () => {
                   </div>
                 </form>
               )}
-
 
               {/* MODAL DE CAMBIO DE CONTRASEÑA */}
               {modalType === 'password' && (
@@ -871,6 +820,8 @@ const UsersSection = () => {
                 </form>
               )}
 
+
+              
               {/* MODAL DE CAMBIO DE FOTO */}
               {modalType === 'photo' && (
                 <form onSubmit={handleUploadPhoto} className="user-form">

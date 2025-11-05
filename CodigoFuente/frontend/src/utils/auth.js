@@ -2,53 +2,56 @@
 // Funciones utilitarias relacionadas con la autenticación y perfiles de usuario
 
 // Devuelve el icono asociado a cada perfil de usuario
-export const getProfileIcon = (perfil) => {
-  const normalizedPerfil = perfil?.toUpperCase() || '';
+export const getProfileIcon = (rol) => {
+  const roleName = typeof rol === 'object' ? rol.nombre_rol : rol;
+  const normalizedRol = roleName?.toLowerCase() || '';
+  
   const icons = { 
-    'ADMINISTRADOR': '👨‍💼',
-    'CAJERO': '💰',
-    'LECTOR': '📖',
-    'CLIENTE': '👤',
-    'USUARIO': '👤'
+    'administrador': '👨‍💼',
+    'cajero': '💰',
+    'lector': '📖',
+    'cliente': '👤',
   };
 
-  return icons[normalizedPerfil] || '👤';
+  return icons[normalizedRol] || '👤';
 };
 
 // Devuelve el color asociado a cada perfil de usuario
-export const getProfileColor = (perfil) => {
-  const normalizedPerfil = perfil?.toUpperCase() || '';
+export const getProfileColor = (rol) => {
+  const roleName = typeof rol === 'object' ? rol.nombre_rol : rol;
+  const normalizedRol = roleName?.toLowerCase() || '';
+  
   const colors = {
-    'ADMINISTRADOR': 'blue',
-    'CAJERO': 'green',
-    'LECTOR': 'purple',
-    'CLIENTE': 'gray',
-    'USUARIO': 'gray'
+    'administrador': 'blue',
+    'cajero': 'green',
+    'lector': 'purple',
+    'cliente': 'gray',
   };
 
-  return colors[normalizedPerfil] || 'gray';
+  return colors[normalizedRol] || 'gray';
 };
 
 // Redirige a la ruta correspondiente según el perfil del usuario
-export const redirectByProfile = (perfil) => {
-  if (!perfil || typeof perfil !== 'string') {
-    console.error('❌ Perfil inválido:', perfil);
+export const redirectByProfile = (rol) => {
+  const roleName = typeof rol === 'object' ? rol.nombre_rol : rol;
+  
+  if (!roleName || typeof roleName !== 'string') {
+    console.error('❌ Rol inválido:', roleName);
     return '/login';
   }
 
-  const normalizedPerfil = perfil.toUpperCase();
+  const normalizedRol = roleName.toLowerCase();
   const routes = {
-    'ADMINISTRADOR': '/admin/dashboard',
-    'CAJERO': '/cajero/dashboard',
-    'LECTOR': '/lector/dashboard',
-    'CLIENTE': '/cliente/dashboard',
-    'USUARIO': '/cliente/dashboard'
+    'administrador': '/admin/dashboard',
+    'cajero': '/cajero/dashboard',
+    'lector': '/lector/dashboard',
+    'cliente': '/cliente/dashboard',
   };
 
-  const route = routes[normalizedPerfil];
+  const route = routes[normalizedRol];
   
   if (!route) {
-    console.error('❌ Rol no encontrado en rutas:', normalizedPerfil);
+    console.error('❌ Rol no encontrado en rutas:', normalizedRol);
     return '/login';
   }
 
@@ -57,32 +60,36 @@ export const redirectByProfile = (perfil) => {
 };
 
 // Obtener el nombre amigable del rol
-export const getRoleName = (perfil) => {
-  const normalizedPerfil = perfil?.toUpperCase() || '';
+export const getRoleName = (rol) => {
+  const roleName = typeof rol === 'object' ? rol.nombre_rol : rol;
+  const normalizedRol = roleName?.toLowerCase() || '';
+  
   const names = {
-    'ADMINISTRADOR': 'Administrador',
-    'CAJERO': 'cajero',
-    'LECTOR': 'Lector de Medidores',
-    'CLIENTE': 'Cliente',
-    'USUARIO': 'Cliente'
+    'administrador': 'Administrador',
+    'cajero': 'Cajero',
+    'lector': 'Lector de Medidores',
+    'cliente': 'Cliente',
   };
 
-  return names[normalizedPerfil] || 'Usuario';
+  return names[normalizedRol] || 'Usuario';
 };
 
 // Verificar si un rol tiene permisos de administrador
-export const isAdmin = (perfil) => {
-  return perfil?.toUpperCase() === 'ADMINISTRADOR';
+export const isAdmin = (rol) => {
+  const roleName = typeof rol === 'object' ? rol.nombre_rol : rol;
+  return roleName?.toLowerCase() === 'administrador';
 };
 
 // Verificar si un rol tiene permisos de gestión financiera
-export const hasFinancialAccess = (perfil) => {
-  const rol = perfil?.toUpperCase();
-  return rol === 'ADMINISTRADOR' || rol === 'CAJERO';
+export const hasFinancialAccess = (rol) => {
+  const roleName = typeof rol === 'object' ? rol.nombre_rol : rol;
+  const normalized = roleName?.toLowerCase();
+  return normalized === 'administrador' || normalized === 'cajero';
 };
 
 // Verificar si un rol puede ver todas las lecturas
-export const canViewAllReadings = (perfil) => {
-  const rol = perfil?.toUpperCase();
-  return rol === 'ADMINISTRADOR' || rol === 'LECTOR';
+export const canViewAllReadings = (rol) => {
+  const roleName = typeof rol === 'object' ? rol.nombre_rol : rol;
+  const normalized = roleName?.toLowerCase();
+  return normalized === 'administrador' || normalized === 'lector';
 };

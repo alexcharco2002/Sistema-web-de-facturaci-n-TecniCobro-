@@ -1,9 +1,7 @@
 /**
- * Servicio de Autenticación con HTTPS
- * Incluye funcionalidad de recuperación de contraseña
+ * Servicio de Autenticación con Sistema de Roles y Permisos
  */
 
-// Configuración del API con HTTPS
 const API_CONFIG = {
   baseURL: process.env.REACT_APP_API_URL || 'https://localhost:8000',
   timeout: 10000,
@@ -12,9 +10,9 @@ const API_CONFIG = {
     logout: '/logout',
     verifySession: '/verify-session',
     profile: '/profile',
+    checkPermission: '/check-permission',
     changePassword: '/change-password',
     healthCheck: '/health',
-    // Nuevos endpoints para recuperación de contraseña
     forgotPassword: '/forgot-password',
     verifyCode: '/verify-code',
     resetPassword: '/reset-password',
@@ -26,10 +24,11 @@ class AuthService {
   constructor() {
     this.token = this.getStoredToken();
     this.user = this.getStoredUser();
+    this.permissions = this.getStoredPermissions();
   }
 
   /**
-   * Obtener token almacenado de forma segura
+   * Obtener token almacenado
    */
   getStoredToken() {
     try {
@@ -55,7 +54,22 @@ class AuthService {
   }
 
   /**
-   * Realizar petición HTTP con configuración común y HTTPS
+   * Obtener permisos almacenados
+   */
+  getStoredPermissions() {
+    try {
+      const permsData = sessionStorage.getItem('user_permissions');
+      if (!permsData || permsData === 'undefined') {
+        return [];
+      }
+      return JSON.parse(permsData);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Realizar petición HTTP
    */
   async makeRequest(endpoint, options = {}) {
     const url = `${API_CONFIG.baseURL}${endpoint}`;
@@ -85,7 +99,7 @@ class AuthService {
     };
 
     try {
-      console.log(`🔒 HTTPS Request: ${finalOptions.method} ${url}`);
+      console.log(`🔒 Request: ${finalOptions.method} ${url}`);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), finalOptions.timeout);
@@ -106,30 +120,24 @@ class AuthService {
         } else if (typeof errorData.detail === 'object') {
           errorMessage = JSON.stringify(errorData.detail);
         } else {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          errorMessage = `HTTPS ${response.status}: ${response.statusText}`;
         }
 
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      console.log(`✅ HTTPS Response:`, data);
-
       return data;
 
     } catch (error) {
-      console.error(`❌ HTTPS Error:`, error);
+      console.error(`❌ Error:`, error);
       
       if (error.name === 'AbortError') {
         throw new Error('La petición tardó demasiado tiempo');
       }
       
       if (error.message.includes('Failed to fetch')) {
-        throw new Error('No se pudo conectar con el servidor. Verifique su conexión HTTPS.');
-      }
-
-      if (error.message.includes('certificate')) {
-        throw new Error('Error de certificado SSL. Acepte el certificado en su navegador.');
+        throw new Error('No se pudo conectar con el servidor.');
       }
 
       throw error;
@@ -145,10 +153,6 @@ class AuthService {
 
       const response = await this.makeRequest(API_CONFIG.endpoints.login, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
         body: JSON.stringify({
           username: credentials.username.trim(),
           password: credentials.password.trim()
@@ -159,27 +163,32 @@ class AuthService {
       if (response.success) {
         this.user = response.data.user;
         this.token = response.data.token;
+        this.permissions = response.data.user.permisos || [];
 
+        // Almacenar en sessionStorage
         sessionStorage.setItem('auth_token', this.token);
         sessionStorage.setItem('user_data', JSON.stringify(this.user));
+        sessionStorage.setItem('user_permissions', JSON.stringify(this.permissions));
         sessionStorage.setItem('login_time', new Date().toISOString());
 
-        console.log('✅ Login exitoso (HTTPS):', {
+        console.log('✅ Login exitoso:', {
           user: this.user.nombre_completo,
-          rol: this.user.rol
+          rol: this.user.rol?.nombre_rol || 'Sin rol',
+          permisos: this.permissions.length
         });
         
         return {
           success: true,
           data: {
             user: this.user,
-            token: this.token
+            token: this.token,
+            permissions: this.permissions
           }
         };
       } else {
         return {
           success: false,
-          message: response.message || 'Credenciales inválidas, Usuario no registrado'
+          message: response.message || 'Credenciales inválidas'
         };
       }
 
@@ -192,132 +201,185 @@ class AuthService {
     }
   }
 
- // Agregar estos métodos a tu clase AuthService existente
-
-/**
- * Solicitar código de recuperación de contraseña
- */
-async forgotPassword(email) {
-  try {
-    if (!email || !email.trim()) {
-      throw new Error('El correo electrónico es requerido');
-    }
-
-    // Validar formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      throw new Error('Formato de correo electrónico inválido');
-    }
-
-    const response = await this.makeRequest(API_CONFIG.endpoints.forgotPassword || '/forgot-password', {
-      method: 'POST',
-      body: JSON.stringify({ email: email.trim().toLowerCase() }),
-      skipAuth: true,
-    });
-
-    return response;
-
-  } catch (error) {
-    console.error('❌ Error en forgotPassword:', error);
-    return {
-      success: false,
-      message: error.message || 'Error al solicitar recuperación de contraseña'
-    };
+  /**
+   * Verificar si el usuario tiene un permiso específico
+   * @param {string} moduleName - Nombre del módulo (ej: 'usuarios', 'lecturas')
+   * @param {string} actionType - Tipo de acción (ej:  'leer', 'actualizar', 'eliminar')
+   */
+ hasPermission(moduleName, actionType = null) {
+  if (!this.permissions || this.permissions.length === 0) {
+    console.warn('⚠️ No hay permisos cargados');
+    return false;
   }
+
+  // Normalizar el nombre del módulo a minúsculas
+  moduleName = moduleName.toLowerCase();
+  
+  const hasAccess = this.permissions.some(perm => {
+    if (!perm.nombre_accion) return false;
+
+    // Separar módulo y acción del permiso
+    const [permModule, permAction] = perm.nombre_accion.split('.');
+    const moduleLower = permModule.toLowerCase();
+    const actionLower = permAction?.toLowerCase();
+
+    // ✅ CAMBIO CLAVE: Si no se especifica acción, 
+    // verificar si tiene CUALQUIER permiso sobre el módulo
+    if (!actionType) {
+      return moduleLower === moduleName;
+    }
+
+    // Normalizar el tipo de acción solicitado
+    const requestedAction = actionType.toLowerCase();
+
+    // Si tiene permiso CRUD, tiene acceso a TODAS las acciones
+    if (moduleLower === moduleName && actionLower === 'crud') {
+      return true;
+    }
+
+    // Verificar coincidencia exacta de módulo y acción
+    if (moduleLower === moduleName && actionLower === requestedAction) {
+      return true;
+    }
+
+    // ✅ LÓGICA ADICIONAL: CRUD implica todas las acciones básicas
+    if (moduleLower === moduleName && actionLower === 'crud') {
+      const basicActions = ['crear', 'leer', 'actualizar', 'eliminar'];
+      return basicActions.includes(requestedAction);
+    }
+
+    return false;
+  });
+
+  console.log(`🔐 Verificando permiso: ${moduleName}${actionType ? '.' + actionType : '.*'} = ${hasAccess}`);
+  return hasAccess;
 }
 
 /**
- * Verificar código de recuperación
+ * Verificar acción específica en un módulo
  */
-async verifyRecoveryCode(email, code) {
-  try {
-    if (!email || !code) {
-      throw new Error('Email y código son requeridos');
-    }
-
-    if (code.length !== 6) {
-      throw new Error('El código debe tener 6 dígitos');
-    }
-
-    const response = await this.makeRequest(API_CONFIG.endpoints.verifyCode || '/verify-code', {
-      method: 'POST',
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        code: code.trim()
-      }),
-      skipAuth: true,
-    });
-
-    return response;
-
-  } catch (error) {
-    console.error('❌ Error en verifyRecoveryCode:', error);
-    return {
-      success: false,
-      message: error.message || 'Error al verificar el código'
-    };
-  }
+canPerformAction(moduleName, actionType) {
+  return this.hasPermission(moduleName, actionType);
 }
 
 /**
- * Restablecer contraseña
+ * Obtener acciones disponibles para un módulo específico
  */
-async resetPassword(email, resetToken, newPassword) {
-  try {
-    if (!email || !resetToken || !newPassword) {
-      throw new Error('Todos los campos son requeridos');
-    }
-
-    if (newPassword.length < 8) {
-      throw new Error('La contraseña debe tener al menos 8 caracteres');
-    }
-
-    const response = await this.makeRequest(API_CONFIG.endpoints.resetPassword || '/reset-password', {
-      method: 'POST',
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        reset_token: resetToken,
-        new_password: newPassword
-      }),
-      skipAuth: true,
-    });
-
-    return response;
-
-  } catch (error) {
-    console.error('❌ Error en resetPassword:', error);
-    return {
-      success: false,
-      message: error.message || 'Error al restablecer la contraseña'
-    };
+getModuleActions(moduleName) {
+  if (!this.permissions || this.permissions.length === 0) {
+    return [];
   }
+
+  moduleName = moduleName.toLowerCase();
+  const actions = [];
+
+  this.permissions.forEach(perm => {
+    if (!perm.nombre_accion) return;
+
+    const [permModule, permAction] = perm.nombre_accion.split('.');
+    
+    if (permModule.toLowerCase() === moduleName) {
+      if (permAction.toLowerCase() === 'crud') {
+        // Si tiene CRUD, agregar todas las acciones básicas
+        actions.push('crear', 'leer', 'actualizar', 'eliminar');
+      } else {
+        actions.push(permAction.toLowerCase());
+      }
+    }
+  });
+
+  // Retornar acciones únicas
+  return [...new Set(actions)];
 }
 
 /**
- * Reenviar código de verificación
+ * Verificar si tiene permiso CRUD completo sobre un módulo
  */
-async resendCode(email) {
-  try {
-    if (!email || !email.trim()) {
-      throw new Error('El correo electrónico es requerido');
+hasCRUDAccess(moduleName) {
+  if (!this.permissions || this.permissions.length === 0) {
+    return false;
+  }
+
+  moduleName = moduleName.toLowerCase();
+  
+  return this.permissions.some(perm => {
+    if (!perm.nombre_accion) return false;
+    const [permModule, permAction] = perm.nombre_accion.split('.');
+    return permModule.toLowerCase() === moduleName && 
+           permAction.toLowerCase() === 'crud';
+  });
+}
+
+  /**
+   * Verificar si puede acceder a un módulo (cualquier acción)
+   */
+  canAccessModule(moduleName) {
+    return this.hasPermission(moduleName);
+  }
+
+  /**
+   * Obtener todos los permisos del usuario
+   */
+  getUserPermissions() {
+    return this.permissions;
+  }
+
+  /**
+   * Verificar si el usuario tiene un rol específico
+   */
+  hasRole(roleName) {
+    if (!this.user || !this.user.rol) {
+      return false;
+    }
+    
+    const userRole = this.user.rol.nombre_rol || '';
+    return userRole.toLowerCase() === roleName.toLowerCase();
+  }
+
+  /**
+   * Verificar si es administrador
+   */
+  isAdmin() {
+    return this.hasRole('administrador');
+  }
+
+  /**
+   * Obtener módulos accesibles para el usuario
+   */
+  getAccessibleModules() {
+    if (!this.permissions || this.permissions.length === 0) {
+      return [];
     }
 
-    const response = await this.makeRequest(API_CONFIG.endpoints.resendCode || '/resend-code', {
-      method: 'POST',
-      body: JSON.stringify({ email: email.trim().toLowerCase() }),
-      skipAuth: true,
+    // Extraer módulos únicos de los permisos
+    const modules = new Set();
+    this.permissions.forEach(perm => {
+      const [module] = perm.nombre_accion.split('.');
+      modules.add(module);
     });
 
-    return response;
-
-  } catch (error) {
-    console.error('❌ Error en resendCode:', error);
-    return {
-      success: false,
-      message: error.message || 'Error al reenviar el código'
-    };
+    return Array.from(modules);
   }
-}
+
+  /**
+   * Verificar permiso en el servidor (opcional, para seguridad adicional)
+   */
+  async checkPermissionOnServer(nombreAccion, tipoAccion) {
+    try {
+      const response = await this.makeRequest(API_CONFIG.endpoints.checkPermission, {
+        method: 'POST',
+        body: JSON.stringify({
+          nombre_accion: nombreAccion,
+          tipo_accion: tipoAccion
+        })
+      });
+
+      return response.has_permission || false;
+    } catch (error) {
+      console.error('Error verificando permiso en servidor:', error);
+      return false;
+    }
+  }
 
   /**
    * Cerrar sesión
@@ -331,7 +393,6 @@ async resendCode(email) {
       }
 
       this.clearLocalData();
-
       console.log('✅ Logout exitoso');
       return { success: true, message: 'Sesión cerrada correctamente' };
 
@@ -343,7 +404,7 @@ async resendCode(email) {
   }
 
   /**
-   * Verificar si la sesión es válida
+   * Verificar sesión
    */
   async verifySession() {
     if (!this.token) {
@@ -355,7 +416,11 @@ async resendCode(email) {
       
       if (response && !response.detail) {
         this.user = response;
+        this.permissions = response.permisos || [];
+        
         sessionStorage.setItem('user_data', JSON.stringify(this.user));
+        sessionStorage.setItem('user_permissions', JSON.stringify(this.permissions));
+        
         return { success: true, user: this.user };
       } else {
         this.clearLocalData();
@@ -370,7 +435,41 @@ async resendCode(email) {
   }
 
   /**
-   * Validar credenciales de login
+   * Limpiar datos locales
+   */
+  clearLocalData() {
+    this.token = null;
+    this.user = null;
+    this.permissions = [];
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('user_data');
+    sessionStorage.removeItem('user_permissions');
+    sessionStorage.removeItem('login_time');
+  }
+
+  /**
+   * Verificar autenticación
+   */
+  isAuthenticated() {
+    return !!(this.token && this.user);
+  }
+
+  /**
+   * Obtener usuario actual
+   */
+  getCurrentUser() {
+    return this.user;
+  }
+
+  /**
+   * Obtener token
+   */
+  getToken() {
+    return this.token;
+  }
+
+  /**
+   * Validar credenciales
    */
   validateLoginCredentials(credentials) {
     if (!credentials.username || !credentials.password) {
@@ -384,58 +483,110 @@ async resendCode(email) {
     if (credentials.password.length < 4) {
       throw new Error('La contraseña debe tener al menos 4 caracteres');
     }
+  }
 
-    const usernameRegex = /^[a-zA-Z0-9._@-]+$/;
-    if (!usernameRegex.test(credentials.username)) {
-      throw new Error('El usuario contiene caracteres no válidos');
+  // Métodos de recuperación de contraseña (mantener los existentes)
+  async forgotPassword(email) {
+    try {
+      if (!email || !email.trim()) {
+        throw new Error('El correo electrónico es requerido');
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new Error('Formato de correo electrónico inválido');
+      }
+
+      const response = await this.makeRequest(API_CONFIG.endpoints.forgotPassword, {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        skipAuth: true,
+      });
+
+      return response;
+    } catch (error) {
+      console.error('❌ Error en forgotPassword:', error);
+      return {
+        success: false,
+        message: error.message || 'Error al solicitar recuperación de contraseña'
+      };
     }
   }
 
-  /**
-   * Limpiar datos locales
-   */
-  clearLocalData() {
-    this.token = null;
-    this.user = null;
-    sessionStorage.removeItem('auth_token');
-    sessionStorage.removeItem('user_data');
-    sessionStorage.removeItem('login_time');
-    
-    if (this.autoLogoutTimer) {
-      clearTimeout(this.autoLogoutTimer);
+  async verifyRecoveryCode(email, code) {
+    try {
+      if (!email || !code) {
+        throw new Error('Email y código son requeridos');
+      }
+
+      const response = await this.makeRequest(API_CONFIG.endpoints.verifyCode, {
+        method: 'POST',
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          code: code.trim()
+        }),
+        skipAuth: true,
+      });
+
+      return response;
+    } catch (error) {
+      console.error('❌ Error en verifyRecoveryCode:', error);
+      return {
+        success: false,
+        message: error.message || 'Error al verificar el código'
+      };
     }
   }
 
-  /**
-   * Verificar si el usuario está autenticado
-   */
-  isAuthenticated() {
-    return !!(this.token && this.user);
+  async resetPassword(email, resetToken, newPassword) {
+    try {
+      if (!email || !resetToken || !newPassword) {
+        throw new Error('Todos los campos son requeridos');
+      }
+
+      const response = await this.makeRequest(API_CONFIG.endpoints.resetPassword, {
+        method: 'POST',
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          reset_token: resetToken,
+          new_password: newPassword
+        }),
+        skipAuth: true,
+      });
+
+      return response;
+    } catch (error) {
+      console.error('❌ Error en resetPassword:', error);
+      return {
+        success: false,
+        message: error.message || 'Error al restablecer la contraseña'
+      };
+    }
   }
 
-  /**
-   * Obtener datos del usuario actual
-   */
-  getCurrentUser() {
-    return this.user;
-  }
+  async resendCode(email) {
+    try {
+      if (!email || !email.trim()) {
+        throw new Error('El correo electrónico es requerido');
+      }
 
-  /**
-   * Obtener token actual
-   */
-  getToken() {
-    return this.token;
-  }
+      const response = await this.makeRequest(API_CONFIG.endpoints.resendCode, {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        skipAuth: true,
+      });
 
-  /**
-   * Verificar si el usuario tiene un rol específico
-   */
-  hasRole(role) {
-    return this.user && this.user.rol === role;
+      return response;
+    } catch (error) {
+      console.error('❌ Error en resendCode:', error);
+      return {
+        success: false,
+        message: error.message || 'Error al reenviar el código'
+      };
+    }
   }
 }
 
-// Crear instancia singleton
 const authService = new AuthService();
 
 export default authService;

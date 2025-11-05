@@ -1,5 +1,5 @@
 // src/components/ProfileSection.js
-// Mejoras en la representación y validación de datos
+// Sección de perfil del usuario con capacidad de editar y guardar cambios
 import React, { useState, useEffect } from 'react';
 import {
   User,
@@ -97,9 +97,29 @@ const ProfileSection = ({ user, onUpdateProfile }) => {
 
     try {
       setSaving(true);
-      console.log('📤 Enviando datos del perfil:', profileData);
       
-      const result = await onUpdateProfile(profileData);
+      // ✅ CORRECCIÓN: El ID se llama 'id_usuario_sistema'
+      const userId = user.id_usuario_sistema || user.id || user.id_usuario || user.usuario_id;
+      
+      if (!userId) {
+        console.error('❌ Usuario completo:', user);
+        throw new Error('No se pudo encontrar el ID del usuario');
+      }
+      
+      const dataToSave = {
+        id: userId,
+        nombres: profileData.nombres,
+        apellidos: profileData.apellidos,
+        sexo: profileData.sexo,
+        fecha_nac: profileData.fecha_nac,
+        email: profileData.email,
+        telefono: profileData.telefono,
+        direccion: profileData.direccion
+      };
+      
+      console.log('📤 Enviando datos del perfil:', dataToSave);
+      
+      const result = await onUpdateProfile(dataToSave);
       
       if (result.success) {
         setEditingProfile(false);
@@ -351,8 +371,8 @@ const ProfileSection = ({ user, onUpdateProfile }) => {
                   Rol del Sistema
                 </label>
                 <div className="form-value">
-                  <span className={`role-badge ${profileData.rol?.toLowerCase()}`}>
-                    {profileData.rol || 'Sin rol'}
+                  <span className={`role-badge ${profileData.rol?.nombre_rol?.toLowerCase()}`}>
+                    {profileData.rol?.nombre_rol || 'Sin rol'}
                   </span>
                 </div>
               </div>

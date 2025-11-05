@@ -582,6 +582,51 @@
   color: var(--text-primary);
   margin: 0;
 }
+/* ========================================
+   FOTO DE PERFIL (DETALLES DE USUARIO)
+   ======================================== */
+
+.user-photo-container {
+  width: 16rem;               /* tamaño equilibrado */
+  height: 16rem;
+  border-radius: 50%;
+  overflow: hidden;
+  margin: 0 auto;            /* centra horizontalmente */
+  border: 3px solid #3b82f6; /* azul primario */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  background-color: #f9fafb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+}
+
+.user-photo-img:hover {
+  transform: scale(1.05);
+}
+
+.user-photo-placeholder {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #3b82f6;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e5e7eb; /* gris claro */
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+}
+
 
 /* ========================================
    FORMULARIO DE USUARIO
@@ -731,4 +776,49 @@
   .form-actions button {
     width: 100%;
   }
+}
+
+/* 🎨 Estilo del contenedor del avatar */
+.user-avatar {
+  position: relative;
+  width: 3.5rem;   /* equivalente a w-14 */
+  height: 3.5rem;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #3b82f6; /* Azul Tailwind: border-blue-500 */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  margin-right: 0.75rem; /* mr-3 */
+  transition: box-shadow 0.3s ease;
+}
+
+/* 🌟 Efecto hover */
+.user-avatar:hover {
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+/* 🖼 Imagen del usuario */
+.user-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* 🚫 Si no tiene foto */
+.user-avatar-empty {
+  background-color: #e5e7eb; /* bg-gray-200 */
+  color: #6b7280;            /* text-gray-500 */
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db; /* border-gray-300 */
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* 🪄 Versión con borde degradado (opcional) */
+.user-avatar.gradient-border {
+  padding: 2px;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
 }

@@ -108,7 +108,7 @@ const UserProfile = ({ user, onLogout, onViewProfile }) => {
           <p className="user-name">
             {user.nombre_completo || `${user.nombres || ''} ${user.apellidos || ''}`.trim() || 'Usuario'}
           </p>
-          <p className="user-role">{user.rol || 'Sin rol'}</p>
+          <p className="user-role">{user.rol?.nombre_rol || 'Sin rol'}</p>
         </div>
 
         {/* Icono dropdown */}

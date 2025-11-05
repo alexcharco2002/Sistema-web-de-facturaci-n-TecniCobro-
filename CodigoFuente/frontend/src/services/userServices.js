@@ -1,7 +1,6 @@
 /**
  * src/services/userServices.js
  * Servicio de Gestión de Usuarios
- * Maneja todas las operaciones CRUD de usuarios con el backend
  */
 
 import authService from './authServices';
@@ -10,6 +9,7 @@ const API_CONFIG = {
   baseURL: 'https://localhost:8000',
   endpoints: {
     users: '/users',
+    roles: '/roles',
     toggleStatus: (id) => `/users/${id}/toggle-status`,
     changePassword: (id) => `/users/${id}/change-password`,
     uploadPhoto: (id) => `/users/${id}/upload-photo`
@@ -17,16 +17,19 @@ const API_CONFIG = {
 };
 
 class UsersService {
+  constructor() {
+    this.cachedRoles = null;
+  }
+
   /**
    * Realizar petición HTTPS con configuración común
    */
   async makeRequest(endpoint, options = {}) {
     const url = `${API_CONFIG.baseURL}${endpoint}`;
-    
+
     const defaultOptions = {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         'Accept': 'application/json',
         'Authorization': `Bearer ${authService.getToken()}`
       },
@@ -42,12 +45,20 @@ class UsersService {
       },
     };
 
+    // ✅ CORRECCIÓN: Solo manejar FormData aquí
+    if (finalOptions.body instanceof FormData) {
+      delete finalOptions.headers['Content-Type'];
+    } else if (finalOptions.body && typeof finalOptions.body === 'object') {
+      // ✅ Si es un objeto normal, agregar Content-Type y convertir a JSON
+      finalOptions.headers['Content-Type'] = 'application/json';
+      finalOptions.body = JSON.stringify(finalOptions.body);
+    }
+
     try {
       console.log(`🌐 API Request: ${finalOptions.method} ${url}`);
-      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), finalOptions.timeout);
-      
+
       const response = await fetch(url, {
         ...finalOptions,
         signal: controller.signal,
@@ -61,6 +72,9 @@ class UsersService {
 
         if (typeof errorData.detail === 'string') {
           errorMessage = errorData.detail;
+        } else if (Array.isArray(errorData.detail)) {
+          // Manejar errores de validación de Pydantic
+          errorMessage = errorData.detail.map(err => err.msg).join(', ');
         } else if (typeof errorData.detail === 'object') {
           errorMessage = JSON.stringify(errorData.detail);
         } else {
@@ -72,21 +86,50 @@ class UsersService {
 
       const data = await response.json();
       console.log(`✅ API Response:`, data);
-
       return data;
 
     } catch (error) {
       console.error(`❌ API Error:`, error);
-      
+
       if (error.name === 'AbortError') {
         throw new Error('La petición tardó demasiado tiempo');
       }
-      
+
       if (error.message.includes('Failed to fetch')) {
         throw new Error('No se pudo conectar con el servidor');
       }
 
       throw error;
+    }
+  }
+
+  /**
+   * Obtener lista de roles disponibles desde t_roles
+   */
+  async getRoles() {
+    try {
+      if (this.cachedRoles) {
+        return {
+          success: true,
+          data: this.cachedRoles
+        };
+      }
+
+      const data = await this.makeRequest(API_CONFIG.endpoints.roles);
+      this.cachedRoles = data;
+
+      return {
+        success: true,
+        data: data
+      };
+
+    } catch (error) {
+      console.error('❌ Error obteniendo roles:', error);
+      return {
+        success: false,
+        message: error.message || 'Error al obtener roles',
+        data: []
+      };
     }
   }
 
@@ -98,7 +141,7 @@ class UsersService {
       const params = new URLSearchParams();
       
       if (filters.search) params.append('search', filters.search);
-      if (filters.rol && filters.rol !== 'all') params.append('rol', filters.rol);
+      if (filters.id_rol && filters.id_rol !== 'all') params.append('id_rol', filters.id_rol);
       if (filters.activo !== undefined) params.append('activo', filters.activo);
       if (filters.skip) params.append('skip', filters.skip);
       if (filters.limit) params.append('limit', filters.limit);
@@ -146,28 +189,27 @@ class UsersService {
   }
 
   /**
-   * Crear un nuevo usuario
+   * ✅ Crear un nuevo usuario - CORREGIDO
    */
   async createUser(userData) {
     try {
-      // Validar datos requeridos
       this.validateUserData(userData, true);
 
+      // ✅ NO usar JSON.stringify aquí, makeRequest lo hace
       const data = await this.makeRequest(API_CONFIG.endpoints.users, {
         method: 'POST',
-        body: JSON.stringify({
-          
+        body: {
           nombres: userData.nombres.trim(),
           apellidos: userData.apellidos.trim(),
-          sexo: userData.sexo || 'otro',  // otro si no se proporciona
-          fecha_nac: userData.fecha_nac || null, // null si no se proporciona
+          sexo: userData.sexo || 'O',
+          fecha_nac: userData.fecha_nac || null,
           cedula: userData.cedula.trim(),
           email: userData.email.trim().toLowerCase(),
           telefono: userData.telefono?.trim() || null,
-          direccion: userData.direccion?.trim() || 'Sanjapamba', // Valor por defecto
-          rol: userData.rol || 'cliente',
+          direccion: userData.direccion?.trim() || 'Sanjapamba',
+          id_rol: userData.id_rol,
           activo: userData.activo !== undefined ? userData.activo : true
-        })
+        }
       });
 
       return {
@@ -186,11 +228,14 @@ class UsersService {
   }
 
   /**
-   * Actualizar un usuario existente
+   * ✅ Actualizar un usuario existente - CORREGIDO
    */
   async updateUser(userId, userData) {
+    if (!userId || isNaN(userId)) {
+      throw new Error('ID de usuario inválido o no definido');
+    }
+
     try {
-      // Validar datos (no requeridos para actualización)
       this.validateUserData(userData, false);
 
       // Filtrar solo los campos que se van a actualizar
@@ -200,18 +245,18 @@ class UsersService {
       if (userData.nombres) updateData.nombres = userData.nombres.trim();
       if (userData.apellidos) updateData.apellidos = userData.apellidos.trim();
       if (userData.sexo) updateData.sexo = userData.sexo.toUpperCase();
-      // no permitir null
       if (userData.fecha_nac) updateData.fecha_nac = userData.fecha_nac;
       if (userData.cedula) updateData.cedula = userData.cedula.trim();
       if (userData.email) updateData.email = userData.email.trim().toLowerCase();
       if (userData.telefono !== undefined) updateData.telefono = userData.telefono?.trim() || null;
       if (userData.direccion !== undefined) updateData.direccion = userData.direccion?.trim() || null;
-      if (userData.rol) updateData.rol = userData.rol;
+      if (userData.id_rol) updateData.id_rol = userData.id_rol;
       if (userData.activo !== undefined) updateData.activo = userData.activo;
 
+      // ✅ NO usar JSON.stringify aquí, makeRequest lo hace
       const data = await this.makeRequest(`${API_CONFIG.endpoints.users}/${userId}`, {
         method: 'PUT',
-        body: JSON.stringify(updateData)
+        body: updateData,
       });
 
       return {
@@ -294,12 +339,13 @@ class UsersService {
         throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
       }
 
+      // ✅ NO usar JSON.stringify aquí
       const data = await this.makeRequest(API_CONFIG.endpoints.changePassword(userId), {
         method: 'PUT',
-        body: JSON.stringify({
+        body: {
           current_password: passwords.currentPassword || '',
           new_password: passwords.newPassword
-        })
+        }
       });
 
       return {
@@ -318,7 +364,7 @@ class UsersService {
   }
 
   /**
-   * Subir foto de perfil
+   * ✅ Subir foto de perfil - CORREGIDO
    */
   async uploadUserPhoto(userId, file) {
     try {
@@ -326,12 +372,10 @@ class UsersService {
         throw new Error('Debe seleccionar un archivo');
       }
 
-      // Validar tipo de archivo
       if (!file.type.startsWith('image/')) {
         throw new Error('El archivo debe ser una imagen');
       }
 
-      // Validar tamaño (máximo 2MB)
       if (file.size > 2 * 1024 * 1024) {
         throw new Error('La imagen no debe superar los 2MB');
       }
@@ -339,12 +383,9 @@ class UsersService {
       const formData = new FormData();
       formData.append('file', file);
 
+      // ✅ makeRequest detectará automáticamente el FormData
       const data = await this.makeRequest(API_CONFIG.endpoints.uploadPhoto(userId), {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authService.getToken()}`
-          // No incluir Content-Type, el navegador lo establecerá automáticamente con boundary
-        },
         body: formData
       });
 
@@ -368,7 +409,6 @@ class UsersService {
    */
   validateUserData(userData, required = true) {
     if (required) {
-      // Validaciones para CREACIÓN
       if (!userData.nombres || userData.nombres.trim().length < 2) {
         throw new Error('El nombre debe tener al menos 2 caracteres');
       }
@@ -377,8 +417,8 @@ class UsersService {
         throw new Error('Los apellidos deben tener al menos 2 caracteres');
       }
 
-      if (!userData.sexo || !['M', 'F'].includes(userData.sexo.toUpperCase())) {
-        throw new Error('Debe seleccionar un sexo válido (M o F)');
+      if (!userData.sexo || !['M', 'F', 'O'].includes(userData.sexo.toUpperCase())) {
+        throw new Error('Debe seleccionar un sexo válido (M, F u O)');
       }
 
       if (!userData.fecha_nac) {
@@ -392,8 +432,12 @@ class UsersService {
       if (!userData.email || !this.isValidEmail(userData.email)) {
         throw new Error('Debe proporcionar un Correo Electrónico válido');
       }
+
+      if (!userData.id_rol || typeof userData.id_rol !== 'number') {
+        throw new Error('Debe seleccionar un rol válido');
+      }
+
     } else {
-      // Validaciones para ACTUALIZACIÓN (solo si el campo está presente)
       if (userData.usuario && userData.usuario.trim().length < 3) {
         throw new Error('El usuario debe tener al menos 3 caracteres');
       }
@@ -402,11 +446,10 @@ class UsersService {
         throw new Error('Debe proporcionar un Correo Electrónico válido');
       }
 
-      if (userData.sexo && !['M', 'F'].includes(userData.sexo.toUpperCase())) {
-        throw new Error('El sexo debe ser M o F');
+      if (userData.sexo && !['M', 'F', 'O'].includes(userData.sexo.toUpperCase())) {
+        throw new Error('El sexo debe ser M, F u O');
       }
 
-      // validar fehca de nacimiento si está presente y no sea mayor a la fecha actual
       if (userData.fecha_nac) {
         const fechaNac = new Date(userData.fecha_nac);
         const hoy = new Date();
@@ -414,15 +457,11 @@ class UsersService {
           throw new Error('La fecha de nacimiento no puede ser mayor a la fecha actual');
         }
       }
-  }
 
-  // Validar rol si está presente
-  if (userData.rol) {
-    const rolesValidos = ['cliente', 'lector', 'cajero', 'administrador'];
-    if (!rolesValidos.includes(userData.rol)) {
-      throw new Error('El rol debe ser administrador, lector, cajero o cliente');
+      if (userData.id_rol && typeof userData.id_rol !== 'number') {
+        throw new Error('El ID del rol debe ser un número válido');
+      }
     }
-  }
   }
 
   /**
@@ -452,11 +491,11 @@ class UsersService {
           total: users.length,
           activos: users.filter(u => u.activo).length,
           inactivos: users.filter(u => !u.activo).length,
-          porRol: {
-            admin: users.filter(u => u.rol === 'admin').length,
-            cliente: users.filter(u => u.rol === 'cliente').length,
-            operador: users.filter(u => u.rol === 'operador').length
-          }
+          porRol: users.reduce((acc, user) => {
+            const rolName = user.rol?.nombre_rol || 'sin_rol';
+            acc[rolName] = (acc[rolName] || 0) + 1;
+            return acc;
+          }, {})
         }
       };
 
@@ -468,26 +507,25 @@ class UsersService {
       };
     }
   }
+
   /**
- * Actualizar usuario actual en localStorage
- */
+   * Actualizar usuario actual en sessionStorage
+   */
   updateCurrentUser(userData) {
     try {
-      const currentUser = this.getCurrentUser();
+      const currentUser = authService.getCurrentUser();
       if (!currentUser) {
         return { success: false, message: 'No hay usuario autenticado' };
       }
 
-      // Combinar datos actuales con los nuevos
       const updatedUser = {
         ...currentUser,
         ...userData
       };
 
-      // Guardar en localStorage
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      sessionStorage.setItem('user_data', JSON.stringify(updatedUser));
 
-      console.log('✅ Usuario actualizado en localStorage');
+      console.log('✅ Usuario actualizado en sessionStorage');
       
       return { success: true, data: updatedUser };
     } catch (error) {
@@ -495,13 +533,16 @@ class UsersService {
       return { success: false, message: error.message };
     }
   }
+
+  /**
+   * Limpiar caché de roles
+   */
+  clearRolesCache() {
+    this.cachedRoles = null;
+  }
 }
 
-// Crear instancia singleton
 const usersService = new UsersService();
 
-// Exportar para uso en React
 export default usersService;
-
-// También exportar la clase
 export { UsersService };

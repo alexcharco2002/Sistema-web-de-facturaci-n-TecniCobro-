@@ -893,7 +893,7 @@
 /* ===== PROFILE SECTION STYLES ===== */
 .profile-section {
   background: var(--bg-white);
-  border-radius: 16px;
+  border-radius: 16px;  
   box-shadow: var(--shadow-md);
   border: 2px solid var(--border-color);
   overflow: hidden;
@@ -1531,4 +1531,804 @@
   border-radius: 8px;
   color: #991b1b;
   margin-bottom: 1.5rem;
+}
+
+/* Estilos adicionales para Dashboard.js con permisos dinámicos */
+
+/* ============================================================================
+   SIDEBAR FOOTER - Información de permisos
+   ============================================================================ */
+.sidebar-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.user-permissions-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+}
+
+.user-permissions-info span {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ============================================================================
+   BANNERS DE INFORMACIÓN Y ERROR
+   ============================================================================ */
+.info-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 0.75rem;
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+}
+
+.info-banner svg {
+  flex-shrink: 0;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border-radius: 0.75rem;
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3);
+}
+
+.error-banner svg {
+  flex-shrink: 0;
+}
+
+.error-banner .btn-link {
+  margin-left: auto;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 0.375rem;
+  color: white;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.error-banner .btn-link:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ============================================================================
+   SECCIÓN DE ACCESO RESTRINGIDO
+   ============================================================================ */
+.section-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 2rem;
+  text-align: center;
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.section-placeholder svg {
+  opacity: 0.5;
+}
+
+.section-placeholder h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: #1f2937;
+}
+
+.section-placeholder p {
+  color: #6b7280;
+  max-width: 500px;
+}
+
+.section-placeholder .btn-primary {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+}
+
+.section-placeholder .btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px -2px rgba(59, 130, 246, 0.4);
+}
+
+/* ============================================================================
+   QUICK ACTIONS - Mejoras visuales
+   ============================================================================ */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 1rem;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.quick-action-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.quick-action-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -8px rgba(59, 130, 246, 0.3);
+  border-color: #3b82f6;
+}
+
+.quick-action-btn:hover::before {
+  opacity: 0.05;
+}
+
+.quick-action-btn:active {
+  transform: translateY(-2px);
+}
+
+.quick-action-icon {
+  width: 2rem;
+  height: 2rem;
+  color: #3b82f6;
+  position: relative;
+  z-index: 1;
+  transition: color 0.2s;
+}
+
+.quick-action-btn:hover .quick-action-icon {
+  color: #2563eb;
+}
+
+.quick-action-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1f2937;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  transition: color 0.2s;
+}
+
+.quick-action-btn:hover .quick-action-text {
+  color: #2563eb;
+}
+
+/* ============================================================================
+   NAV ITEM - Mejoras para indicar permisos
+   ============================================================================ */
+.nav-item {
+  position: relative;
+}
+
+.nav-item::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  background: white;
+  border-radius: 0 3px 3px 0;
+  transition: height 0.3s ease;
+}
+
+.nav-item.active::after {
+  height: 60%;
+}
+
+.nav-item:hover::after {
+  height: 40%;
+}
+
+/* ============================================================================
+   LOADING STATE
+   ============================================================================ */
+.dashboard-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.loading-spinner p {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* ============================================================================
+   REFRESH BUTTON
+   ============================================================================ */
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #6b7280;
+}
+
+.refresh-btn:hover {
+  background: #f9fafb;
+  border-color: #3b82f6;
+  color: #3b82f6;
+  transform: rotate(180deg);
+}
+
+.refresh-btn:active {
+  transform: rotate(180deg) scale(0.95);
+}
+
+.refresh-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.refresh-btn.loading {
+  pointer-events: none;
+}
+
+/* ============================================================================
+   ROLE STATS
+   ============================================================================ */
+.role-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.role-stat-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #f9fafb;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.role-stat-item:hover {
+  background: #f3f4f6;
+  transform: translateX(4px);
+}
+
+.role-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.role-stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+/* ============================================================================
+   RESPONSIVE
+   ============================================================================ */
+@media (max-width: 768px) {
+  .quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sidebar-footer {
+    padding: 0.75rem;
+  }
+
+  .user-permissions-info {
+    padding: 0.375rem;
+  }
+
+  .info-banner,
+  .error-banner {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .error-banner .btn-link {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================================
+   SIDEBAR CON CATEGORÍAS COLAPSABLES
+   ============================================================================ */
+
+/* Contenedor de categoría */
+.nav-category {
+  margin-bottom: 0.5rem;
+}
+
+/* Header de categoría colapsable */
+.category-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 0.5rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 0.25rem;
+}
+
+.category-header:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(2px);
+}
+
+.category-header-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.category-label {
+  font-weight: 600;
+}
+
+/* Header de categoría estática (no colapsable) */
+.category-header-static {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+/* Contenedor de módulos dentro de categoría */
+.category-modules {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-left: 0.5rem;
+  margin-bottom: 0.5rem;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Nav Item dentro de categoría */
+.category-modules .nav-item {
+  padding: 0.625rem 1rem;
+  margin: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.category-modules .nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: white;
+  transform: scaleY(0);
+  transition: transform 0.2s;
+}
+
+.category-modules .nav-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  transform: translateX(4px);
+}
+
+.category-modules .nav-item:hover::before {
+  transform: scaleY(1);
+}
+
+.category-modules .nav-item.active {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+  font-weight: 500;
+}
+
+.category-modules .nav-item.active::before {
+  transform: scaleY(1);
+}
+
+.category-modules .nav-item svg {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* ============================================================================
+   SIDEBAR SCROLLABLE - BARRA LATERAL DESPLAZABLE
+   ============================================================================ */
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1rem;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================================================
+   RESUMEN DE MÓDULOS (Overview)
+   ============================================================================ */
+
+.modules-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.module-category-summary {
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.module-category-summary:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.category-summary-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.category-summary-header svg {
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+.module-count {
+  margin-left: auto;
+  padding: 0.25rem 0.5rem;
+  background: #3b82f6;
+  color: white;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ============================================================================
+   SIDEBAR FOOTER
+   ============================================================================ */
+
+.sidebar-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.user-permissions-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.user-permissions-info:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.user-permissions-info svg {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.user-permissions-info span {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+/* ============================================================================
+   RESPONSIVE - SIDEBAR COLAPSABLE EN MÓVIL
+   ============================================================================ */
+
+@media (max-width: 1024px) {
+  .sidebar {
+    position: fixed;
+    left: -280px;
+    z-index: 1000;
+    transition: left 0.3s;
+  }
+
+  .sidebar.open {
+    left: 0;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+
+  .category-header {
+    font-size: 0.7rem;
+    padding: 0.625rem 0.875rem;
+  }
+
+  .category-modules .nav-item {
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.875rem;
+  }
+
+  .sidebar-footer {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .category-header-content {
+    gap: 0.375rem;
+  }
+
+  .category-modules {
+    padding-left: 0.25rem;
+  }
+
+  .category-modules .nav-item {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .category-modules .nav-item svg {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+/* ============================================================================
+   ANIMACIONES ADICIONALES
+   ============================================================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.nav-category {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Efecto de hover en categoría */
+.category-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.category-header:hover::after {
+  opacity: 1;
+}
+
+/* Badge de nuevo módulo */
+.nav-item .new-badge {
+  margin-left: auto;
+  padding: 0.125rem 0.375rem;
+  background: #ef4444;
+  color: white;
+  border-radius: 0.25rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* ============================================================================
+   TEMA CLARO (OPCIONAL)
+   ============================================================================ */
+
+@media (prefers-color-scheme: light) {
+  .sidebar {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+  }
+
+  .category-header {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .category-header:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .category-modules .nav-item {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .category-modules .nav-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .category-modules .nav-item.active {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* ============================================================================
+   ACCESIBILIDAD
+   ============================================================================ */
+
+.category-header:focus,
+.category-modules .nav-item:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.category-header:focus:not(:focus-visible),
+.category-modules .nav-item:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Reducir movimiento para usuarios con preferencias de accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  .category-header,
+  .category-modules .nav-item,
+  .category-modules,
+  .nav-category {
+    animation: none;
+    transition: none;
+  }
+
+  .category-modules .nav-item:hover {
+    transform: none;
+  }
 }

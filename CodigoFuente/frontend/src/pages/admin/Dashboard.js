@@ -1,40 +1,33 @@
 // src/pages/admin/Dashboard.js
-// Panel de Administración - Dashboard.js con datos reales 593
+// Dashboard con Sidebar Organizado por Categorías
 
-//importar librerías y servicios
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import authService from '../../services/authServices';   // Servicio de autenticación
-import userService from '../../services/userServices';   // Servicio para manejar datos de usuarios
+import authService from '../../services/authServices';
+import userService from '../../services/userServices';
 
 
-// Importar componentes separados
+
+// Importar configuración de módulos
+import { buildModulesFromPermissions } from '../../utils/modulesDefinitions';
+
+// Componentes
 import NotificationDropdown from '../../components/NotificationDropdown';
 import UserProfile from '../../components/UserProfile';
 import UsersSection from '../../components/UsersSection';
 import InvoicesSection from '../../components/InvoicesSection';
 import ProfileSection from '../../components/ProfileSection';
+import RolesSection from '../../components/RolesSection'; 
+import SectorsSection from '../../components/SectorsSection';
 
-//Importar estilos
+// Estilos
 import './style.css';
 
-// Importar iconos
+// Iconos
 import { 
-  Users, 
-  FileText, 
-  DollarSign, 
-  Settings, 
-  Search,
-  Plus,
-  Droplets,
-  BarChart3,
-  Calendar,
-  TrendingUp,
-  Activity,
-  AlertCircle,
-  RefreshCw,
-  User,
-  Shield
+  Search, RefreshCw, AlertCircle, TrendingUp,
+  ChevronDown, ChevronRight, Droplets,
+  Users, DollarSign, Activity, Shield
 } from 'lucide-react';
 
 const AdminDashboard = () => {
@@ -43,9 +36,10 @@ const AdminDashboard = () => {
   const [notifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [userPermissions, setUserPermissions] = useState([]);
+  const [organizedModules, setOrganizedModules] = useState([]);
+  const [expandedCategories, setExpandedCategories] = useState({});
 
-  // Estados para datos reales
-  
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -60,8 +54,11 @@ const AdminDashboard = () => {
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState(null);
 
+  // ============================================================================
+  // EFECTOS Y CARGA DE DATOS
+  // ============================================================================
+
   useEffect(() => {
-    // Verificar autenticación y obtener datos del usuario
     const currentUser = authService.getCurrentUser();
     
     if (!currentUser || !authService.isAuthenticated()) {
@@ -71,9 +68,28 @@ const AdminDashboard = () => {
     }
 
     setUser(currentUser);
-    console.log('Usuario autenticado:', currentUser);
+    const permissions = authService.getUserPermissions();
+    setUserPermissions(permissions);
+    
+    // Construir módulos organizados por categorías
+    const modules = buildModulesFromPermissions(permissions);
+    setOrganizedModules(modules);
+    
+    // Inicializar categorías expandidas
+    const initialExpanded = {};
+    modules.forEach(category => {
+      initialExpanded[category.id] = category.defaultOpen !== false;
+    });
+    setExpandedCategories(initialExpanded);
+    
+    console.log('✅ Usuario autenticado:', {
+      nombre: currentUser.nombres,
+      rol: currentUser.rol?.nombre_rol,
+      permisos: permissions.length,
+      categorias: modules.length
+    });
 
-    // Verificar sesión con el servidor
+    // Verificar sesión
     const verifySession = async () => {
       const result = await authService.verifySession();
       if (!result.success) {
@@ -85,56 +101,47 @@ const AdminDashboard = () => {
     verifySession();
   }, [navigate]);
 
-  // Cargar datos reales de usuarios
   useEffect(() => {
     if (user) {
       loadDashboardData();
     }
   }, [user]);
 
-  // Función para cargar datos del dashboard
   const loadDashboardData = async () => {
     try {
       setDataLoading(true);
       setDataError(null);
 
-      // Obtener todos los usuarios
-      const result = await userService.getUsers({
-        limit: 1000 // Obtener todos los usuarios para estadísticas
-      });
+      if (authService.hasPermission('usuarios', 'leer')) {
+        const result = await userService.getUsers({ limit: 1000 });
 
-      if (result.success) {
-        const usersData = Array.isArray(result.data) 
-        ? result.data 
-        : result.data.usuarios || [];
+        if (result.success) {
+          const usersData = Array.isArray(result.data) 
+            ? result.data 
+            : result.data.usuarios || [];
 
-        // Calcular estadísticas reales
-        const totalUsers = usersData.length;
-        const activeUsers = usersData.filter(u => u.activo).length;
-        const inactiveUsers = totalUsers - activeUsers;
+          const totalUsers = usersData.length;
+          const activeUsers = usersData.filter(u => u.activo).length;
+          const inactiveUsers = totalUsers - activeUsers;
 
-        // Contar usuarios por rol
-        const usersByRole = usersData.reduce((acc, user) => {
-          const rol = user.rol?.toLowerCase() || 'sin_rol';
-          acc[rol] = (acc[rol] || 0) + 1;
-          return acc;
-        }, {
-          administrador: 0,
-          cliente: 0,
-          lector: 0,
-          cajero: 0
-        });
+          const usersByRole = usersData.reduce((acc, user) => {
+            const rol = user.rol?.nombre_rol.toLowerCase() || 'sin_rol';
+            acc[rol] = (acc[rol] || 0) + 1;
+            return acc;
+          }, {
+            administrador: 0,
+            cliente: 0,
+            lector: 0,
+            cajero: 0
+          });
 
-        setStats({
-          totalUsers,
-          activeUsers,
-          inactiveUsers,
-          usersByRole
-        });
-
-      } else {
-        setDataError(result.message || 'Error al cargar datos');
-        console.error('Error cargando usuarios:', result.message);
+          setStats({
+            totalUsers,
+            activeUsers,
+            inactiveUsers,
+            usersByRole
+          });
+        }
       }
 
     } catch (error) {
@@ -145,7 +152,10 @@ const AdminDashboard = () => {
     }
   };
 
-  // Función para manejar el cierre de sesión
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
   const handleLogout = async () => {
     if (window.confirm('¿Estás seguro de que deseas cerrar sesión?')) {
       try {
@@ -158,14 +168,12 @@ const AdminDashboard = () => {
     }
   };
 
-  // Función para manejar el refresh
   const handleRefresh = async () => {
     setLoading(true);
     await loadDashboardData();
     setLoading(false);
   };
 
-  // Handlers para las notificaciones
   const handleMarkAsRead = (notificationId) => {
     console.log('Marcar como leída:', notificationId);
   };
@@ -174,135 +182,71 @@ const AdminDashboard = () => {
     console.log('Ver todas las notificaciones');
   };
 
-  
-
   const handleSettingsClick = () => {
     setActiveSection('settings');
   };
 
-  // Handler para actualizar perfil
   const handleUpdateProfile = async (profileData) => {
-  try {
-    console.log('📤 Actualizando perfil con datos:', profileData);
-    
-    // Validar que tenemos el ID del usuario
-    if (!user?.id_usuario_sistema) {
-      throw new Error('No se encontró el ID del usuario');
-    }
+    try {
+      if (!user?.id_usuario_sistema) {
+        throw new Error('No se encontró el ID del usuario');
+      }
 
-    // Preparar los datos para enviar al backend
-    const dataToUpdate = {
-      nombres: profileData.nombres,
-      apellidos: profileData.apellidos,
-      sexo: profileData.sexo,
-      fecha_nac: profileData.fecha_nac,
-      email: profileData.email,
-      telefono: profileData.telefono || null,
-      direccion: profileData.direccion || null,
-      // No incluir rol, activo, fecha_registro (campos del sistema)
-    };
-
-    console.log('📦 Datos a enviar al backend:', dataToUpdate);
-
-    // Llamar al servicio de usuarios (asume que lo tienes importado)
-    const result = await userService.updateUser(user.id_usuario_sistema, dataToUpdate);
-    
-    if (result.success) {
-      console.log('✅ Perfil actualizado exitosamente:', result.data);
-      
-      // Actualizar el estado local con los datos devueltos por el backend
-      setUser(prevUser => ({
-        ...prevUser,
-        ...result.data
-      }));
-      
-      return { 
-        success: true,
-        message: 'Perfil actualizado correctamente'
+      const dataToUpdate = {
+        nombres: profileData.nombres,
+        apellidos: profileData.apellidos,
+        sexo: profileData.sexo,
+        fecha_nac: profileData.fecha_nac,
+        email: profileData.email,
+        telefono: profileData.telefono || null,
+        direccion: profileData.direccion || null,
       };
-    } else {
-      console.error('❌ Error del servidor:', result.message);
+
+      const result = await userService.updateUser(user.id_usuario_sistema, dataToUpdate);
+      
+      if (result.success) {
+        setUser(prevUser => ({
+          ...prevUser,
+          ...result.data
+        }));
+        
+        return { 
+          success: true,
+          message: 'Perfil actualizado correctamente'
+        };
+      } else {
+        return { 
+          success: false, 
+          message: result.message || 'Error al actualizar el perfil'
+        };
+      }
+      
+    } catch (error) {
+      console.error('❌ Error al actualizar perfil:', error);
       return { 
         success: false, 
-        message: result.message || 'Error al actualizar el perfil'
+        message: error.message || 'Error al actualizar el perfil'
       };
     }
-    
-  } catch (error) {
-    console.error('❌ Error al actualizar perfil:', error);
-    return { 
-      success: false, 
-      message: error.message || 'Error al actualizar el perfil'
-    };
-  }
-};
+  };
 
-  // Calcular cambio porcentual (simulado por ahora)
+  const toggleCategory = (categoryId) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
+
   const calculatePercentageChange = (current, previous = 0) => {
     if (previous === 0) return '+100%';
     const change = ((current - previous) / previous) * 100;
     return change >= 0 ? `+${change.toFixed(1)}%` : `${change.toFixed(1)}%`;
   };
 
-  // Mostrar loading mientras se carga el usuario
-  if (!user) {
-    return (
-      <div className="dashboard-loading">
-        <div className="loading-spinner">
-          <RefreshCw className="w-8 h-8 animate-spin" />
-          <p>Cargando dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  // ============================================================================
+  // COMPONENTES
+  // ============================================================================
 
-  const sidebarItems = [
-    { id: 'overview', label: 'Panel General', icon: BarChart3 },
-    { id: 'profile', label: 'Mi Perfil', icon: User },
-    { id: 'users', label: 'Usuarios', icon: Users },
-    { id: 'invoices', label: 'Facturación', icon: FileText },
-    { id: 'payments', label: 'Pagos', icon: DollarSign },
-    { id: 'reports', label: 'Reportes', icon: Calendar },
-    { id: 'settings', label: 'Configuración', icon: Settings }
-  ];
-
-  // Tarjetas de estadísticas con datos reales
-  const statCards = [
-    { 
-      title: 'Total Usuarios', 
-      value: dataLoading ? '...' : stats.totalUsers.toString(), 
-      change: calculatePercentageChange(stats.totalUsers), 
-      color: 'blue',
-      icon: Users,
-      trend: 'up'
-    },
-    { 
-      title: 'Usuarios Activos', 
-      value: dataLoading ? '...' : stats.activeUsers.toString(), 
-      change: calculatePercentageChange(stats.activeUsers), 
-      color: 'green',
-      icon: Activity,
-      trend: 'up'
-    },
-    { 
-      title: 'Clientes', 
-      value: dataLoading ? '...' : (stats.usersByRole.cliente || 0).toString(), 
-      change: calculatePercentageChange(stats.usersByRole.cliente), 
-      color: 'emerald',
-      icon: User,
-      trend: 'up'
-    },
-    { 
-      title: 'Usuarios Inactivos', 
-      value: dataLoading ? '...' : stats.inactiveUsers.toString(), 
-      change: calculatePercentageChange(stats.inactiveUsers), 
-      color: 'orange',
-      icon: AlertCircle,
-      trend: stats.inactiveUsers > 0 ? 'down' : 'up'
-    }
-  ];
-
-  // Componente de estadísticas
   const StatCard = ({ stat }) => {
     const IconComponent = stat.icon;
     const TrendIcon = TrendingUp;
@@ -328,9 +272,67 @@ const AdminDashboard = () => {
     );
   };
 
+  // ============================================================================
+  // RENDER LOADING
+  // ============================================================================
+
+  if (!user) {
+    return (
+      <div className="dashboard-loading">
+        <div className="loading-spinner">
+          <RefreshCw className="w-8 h-8 animate-spin" />
+          <p>Cargando dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Verificar si tiene acceso a estadísticas de usuarios
+  const canViewUserStats = authService.hasPermission('usuarios', 'leer');
+
+  // Tarjetas de estadísticas (solo si tiene permisos)
+  const statCards = canViewUserStats ? [
+    { 
+      title: 'Total Usuarios', 
+      value: dataLoading ? '...' : stats.totalUsers.toString(), 
+      change: calculatePercentageChange(stats.totalUsers), 
+      color: 'blue',
+      icon: Users,
+      trend: 'up'
+    },
+    { 
+      title: 'Usuarios Activos', 
+      value: dataLoading ? '...' : stats.activeUsers.toString(), 
+      change: calculatePercentageChange(stats.activeUsers), 
+      color: 'green',
+      icon: Activity,
+      trend: 'up'
+    },
+    { 
+      title: 'Clientes', 
+      value: dataLoading ? '...' : (stats.usersByRole.cliente || 0).toString(), 
+      change: calculatePercentageChange(stats.usersByRole.cliente), 
+      color: 'emerald',
+      icon: Users,
+      trend: 'up'
+    },
+    { 
+      title: 'Usuarios Inactivos', 
+      value: dataLoading ? '...' : stats.inactiveUsers.toString(), 
+      change: calculatePercentageChange(stats.inactiveUsers), 
+      color: 'orange',
+      icon: AlertCircle,
+      trend: stats.inactiveUsers > 0 ? 'down' : 'up'
+    }
+  ] : [];
+
+  // ============================================================================
+  // RENDER PRINCIPAL
+  // ============================================================================
+
   return (
     <div className="dashboard">
-      {/* Sidebar */}
+      {/* Sidebar con Categorías */}
       <div className="sidebar">
         <div className="sidebar-header">
           <div className="logo-container">
@@ -345,20 +347,63 @@ const AdminDashboard = () => {
         </div>
 
         <nav className="sidebar-nav">
-          {sidebarItems.map((item) => {
-            const IconComponent = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`nav-item ${activeSection === item.id ? 'active' : ''}`}
-              >
-                <IconComponent className="w-5 h-5" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+          {organizedModules.map((category) => (
+            <div key={category.id} className="nav-category">
+              {/* Header de categoría */}
+              {category.collapsible ? (
+                <button
+                  className="category-header"
+                  onClick={() => toggleCategory(category.id)}
+                >
+                  <div className="category-header-content">
+                    <category.icon className="w-4 h-4" />
+                    <span className="category-label">{category.label}</span>
+                  </div>
+                  {expandedCategories[category.id] ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+              ) : (
+                <div className="category-header-static">
+                  <category.icon className="w-4 h-4" />
+                  <span className="category-label">{category.label}</span>
+                </div>
+              )}
+
+              {/* Módulos de la categoría */}
+              {(!category.collapsible || expandedCategories[category.id]) && (
+                <div className="category-modules">
+                  {category.modules.map((module) => {
+                    const IconComponent = module.icon;
+                    return (
+                      <button
+                        key={module.id}
+                        onClick={() => setActiveSection(module.id)}
+                        className={`nav-item ${activeSection === module.id ? 'active' : ''}`}
+                        title={module.description || module.label}
+                      >
+                        <IconComponent className="w-5 h-5" />
+                        <span>{module.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
         </nav>
+
+        {/* Información de permisos del usuario */}
+        <div className="sidebar-footer">
+          <div className="user-permissions-info">
+            <Shield className="w-4 h-4 text-gray-400" />
+            <span className="text-xs text-gray-500">
+              {userPermissions.length} permisos activos
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -367,7 +412,7 @@ const AdminDashboard = () => {
         <header className="header">
           <div className="header-content">
             <div className="header-title">
-              <h1>Panel de Administración</h1>
+              <h1>Panel de {user.rol?.nombre_rol || 'Usuario'}</h1>
               <p>Bienvenido, {user.nombres || `${user.nombres} ${user.apellidos}`}</p>
             </div>
 
@@ -377,7 +422,7 @@ const AdminDashboard = () => {
                 <Search className="search-icon" />
                 <input
                   type="text"
-                  placeholder="Buscar usuarios, facturas..."
+                  placeholder="Buscar..."
                   className="search-input"
                 />
               </div>
@@ -392,20 +437,19 @@ const AdminDashboard = () => {
                 <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
               </button>
 
-              {/* Notifications Component */}
+              {/* Notifications */}
               <NotificationDropdown
                 notifications={notifications}
                 onMarkAsRead={handleMarkAsRead}
                 onViewAll={handleViewAllNotifications}
               />
 
-              {/* User Profile Component */}
+              {/* User Profile */}
               <UserProfile
                 user={user}
                 onLogout={handleLogout}
                 onViewProfile={() => setActiveSection('profile')}
                 onSettingsClick={handleSettingsClick}
-
               />
             </div>
           </div>
@@ -426,125 +470,133 @@ const AdminDashboard = () => {
                 </div>
               )}
 
-              {/* Stats Grid */}
-              <div className="stats-grid">
-                {statCards.map((stat, index) => (
-                  <StatCard key={index} stat={stat} />
-                ))}
-              </div>
+              {/* Stats Grid - Solo si tiene permisos */}
+              {canViewUserStats && statCards.length > 0 && (
+                <div className="stats-grid">
+                  {statCards.map((stat, index) => (
+                    <StatCard key={index} stat={stat} />
+                  ))}
+                </div>
+              )}
+
+              {/* Mensaje si no tiene permisos para ver estadísticas */}
+              {!canViewUserStats && (
+                <div className="info-banner">
+                  <AlertCircle className="w-5 h-5" />
+                  <span>Bienvenido al sistema. Usa el menú lateral para acceder a tus módulos disponibles.</span>
+                </div>
+              )}
 
               {/* Content Grid */}
               <div className="content-grid">
-                {/* Distribución de Usuarios por Rol */}
-                <div className="card">
-                  <div className="card-header">
-                    <h3 className="card-title">Usuarios por Rol</h3>
-                    <button className="btn-link" onClick={() => setActiveSection('users')}>
-                      Ver todos
-                    </button>
+                {/* Distribución de Usuarios - Solo si tiene permisos */}
+                {canViewUserStats && (
+                  <div className="card">
+                    <div className="card-header">
+                      <h3 className="card-title">Usuarios por Rol</h3>
+                      {authService.hasPermission('usuarios', 'leer') && (
+                        <button className="btn-link" onClick={() => setActiveSection('users')}>
+                          Ver todos
+                        </button>
+                      )}
+                    </div>
+                    <div className="role-distribution">
+                      {dataLoading ? (
+                        <div className="loading-state">
+                          <RefreshCw className="w-6 h-6 animate-spin" />
+                          <p>Cargando datos...</p>
+                        </div>
+                      ) : (
+                        <div className="role-stats-list">
+                          <div className="role-stat-item">
+                            <div className="role-stat-label">
+                              <Shield className="w-4 h-4 text-red-500" />
+                              <span>Administradores</span>
+                            </div>
+                            <span className="role-stat-value">{stats.usersByRole.administrador || 0}</span>
+                          </div>
+                          <div className="role-stat-item">
+                            <div className="role-stat-label">
+                              <Users className="w-4 h-4 text-blue-500" />
+                              <span>Clientes</span>
+                            </div>
+                            <span className="role-stat-value">{stats.usersByRole.cliente || 0}</span>
+                          </div>
+                          <div className="role-stat-item">
+                            <div className="role-stat-label">
+                              <Activity className="w-4 h-4 text-green-500" />
+                              <span>Lectores</span>
+                            </div>
+                            <span className="role-stat-value">{stats.usersByRole.lector || 0}</span>
+                          </div>
+                          <div className="role-stat-item">
+                            <div className="role-stat-label">
+                              <DollarSign className="w-4 h-4 text-yellow-500" />
+                              <span>Cajeros</span>
+                            </div>
+                            <span className="role-stat-value">{stats.usersByRole.cajero || 0}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="role-distribution">
-                    {dataLoading ? (
-                      <div className="loading-state">
-                        <RefreshCw className="w-6 h-6 animate-spin" />
-                        <p>Cargando datos...</p>
-                      </div>
-                    ) : (
-                      <div className="role-stats-list">
-                        <div className="role-stat-item">
-                          <div className="role-stat-label">
-                            <Shield className="w-4 h-4 text-red-500" />
-                            <span>Administradores</span>
-                          </div>
-                          <span className="role-stat-value">{stats.usersByRole.administrador || 0}</span>
-                        </div>
-                        <div className="role-stat-item">
-                          <div className="role-stat-label">
-                            <User className="w-4 h-4 text-blue-500" />
-                            <span>Clientes</span>
-                          </div>
-                          <span className="role-stat-value">{stats.usersByRole.cliente || 0}</span>
-                        </div>
-                        <div className="role-stat-item">
-                          <div className="role-stat-label">
-                            <Activity className="w-4 h-4 text-green-500" />
-                            <span>Lectores</span>
-                          </div>
-                          <span className="role-stat-value">{stats.usersByRole.lector || 0}</span>
-                        </div>
-                        <div className="role-stat-item">
-                          <div className="role-stat-label">
-                            <DollarSign className="w-4 h-4 text-yellow-500" />
-                            <span>Cajeros</span>
-                          </div>
-                          <span className="role-stat-value">{stats.usersByRole.cajero || 0}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
 
-                {/* Quick Actions */}
+                {/* Resumen de Módulos Disponibles */}
                 <div className="card">
                   <div className="card-header">
-                    <h3 className="card-title">Acciones Rápidas</h3>
+                    <h3 className="card-title">Módulos Disponibles</h3>
                   </div>
-                  <div className="quick-actions-grid">
-                    <button className="quick-action-btn" onClick={() => setActiveSection('users')}>
-                      <Plus className="quick-action-icon" />
-                      <span className="quick-action-text">Nuevo Usuario</span>
-                    </button>
-                    <button className="quick-action-btn" onClick={() => setActiveSection('invoices')}>
-                      <FileText className="quick-action-icon" />
-                      <span className="quick-action-text">Nueva Factura</span>
-                    </button>
-                    <button className="quick-action-btn" onClick={() => setActiveSection('reports')}>
-                      <BarChart3 className="quick-action-icon" />
-                      <span className="quick-action-text">Ver Reportes</span>
-                    </button>
-                    <button className="quick-action-btn" onClick={() => setActiveSection('settings')}>
-                      <Settings className="quick-action-icon" />
-                      <span className="quick-action-text">Configurar</span>
-                    </button>
+                  <div className="modules-summary">
+                    {organizedModules.map(category => (
+                      <div key={category.id} className="module-category-summary">
+                        <div className="category-summary-header">
+                          <category.icon className="w-4 h-4" />
+                          <span>{category.label}</span>
+                          <span className="module-count">{category.modules.length}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Profile Section - Ahora usando componente separado */}
+          {/* Profile Section */}
           {activeSection === 'profile' && (
             <ProfileSection 
-              user={user}  // pasar datos del usuario
-              onUpdateProfile={handleUpdateProfile} // función para actualizar perfil
+              user={user}
+              onUpdateProfile={handleUpdateProfile}
             />
           )}
 
-          {/* Secciones usando componentes separados */}
-          {activeSection === 'users' && <UsersSection />}
-          {activeSection === 'invoices' && <InvoicesSection />}
-
-          {activeSection === 'payments' && (
-            <div className="section-placeholder">
-              <DollarSign className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Gestión de Pagos</h2>
-              <p>El módulo de pagos permitirá procesar y rastrear todos los pagos del sistema.</p>
-            </div>
+          {/* Users Section */}
+          {activeSection === 'users' && (
+            <UsersSection />
           )}
 
-          {activeSection === 'reports' && (
-            <div className="section-placeholder">
-              <Calendar className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Centro de Reportes</h2>
-              <p>Próximamente tendrás acceso a reportes detallados y análisis de datos.</p>
-            </div>
+          {/* Invoices Section */}
+          {activeSection === 'invoices' && (
+            <InvoicesSection />
           )}
 
-          {activeSection === 'settings' && (
+          {/*Role Seccion   */}
+          {activeSection === 'roles' && (
+            <RolesSection />
+          )}
+
+          {/* Sectors Section */}
+          {activeSection === 'sectors' && (
+            <SectorsSection />
+          )}
+
+          {/* Secciones genéricas para otros módulos */}
+          {!['overview', 'profile', 'users', 'invoices','roles', 'sectors' ].includes(activeSection) && (
             <div className="section-placeholder">
-              <Settings className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Configuración del Sistema</h2>
-              <p>Panel de configuración para personalizar el comportamiento del sistema.</p>
+              <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h2>Módulo en Desarrollo</h2>
+              <p>Esta sección estará disponible próximamente.</p>
             </div>
           )}
         </main>
