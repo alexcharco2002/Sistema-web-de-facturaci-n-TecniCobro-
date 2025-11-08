@@ -1,8 +1,9 @@
 // src/components/SectorsSection.js
-// MÓDULO DE SECTORES
+// MÓDULO DE SECTORES - Con control de permisos granular
 import React, { useState, useEffect, useCallback } from 'react';
 import './styleSectors.css';
 import sectorsService from '../services/sectorServices';
+import authService from '../services/authServices'; // 🔑 Importar authService
 
 import { 
   MapPin, Plus, Search, Edit, Trash2, Eye, CheckCircle, XCircle,
@@ -25,8 +26,63 @@ const SectorsSection = () => {
     activo: true
   });
 
+  // 🔑 PERMISOS DEL USUARIO ACTUAL
+  const [permissions, setPermissions] = useState({
+    canCreate: false,
+    canRead: false,
+    canUpdate: false,
+    canDelete: false,
+    canToggleStatus: false
+  });
+
+  // 🔑 Cargar permisos al montar el componente
+  useEffect(() => {
+    loadUserPermissions();
+  }, []);
+
+  const loadUserPermissions = () => {
+    // Verificar permisos sobre el módulo 'sectores'
+    const canCreate = authService.hasPermission('sectores', 'crear') || 
+                     authService.hasPermission('sectores', 'operaciones crud');
+  
+    const canUpdate = authService.hasPermission('sectores', 'actualizar') || 
+                     authService.hasPermission('sectores', 'operaciones crud') ;
+    
+    const canDelete = authService.hasPermission('sectores', 'eliminar') || 
+                     authService.hasPermission('sectores', 'operaciones crud');
+    // ✅ Si puede crear, actualizar o eliminar, también debe poder leer
+    const canRead = authService.hasPermission('sectores', 'lectura') ||
+               canCreate || canUpdate || canDelete ||
+               authService.hasPermission('sectores', 'operaciones crud');
+
+    // Permisos adicionales
+    const canToggleStatus = canUpdate; // Cambiar estado requiere actualizar
+
+    setPermissions({
+      canCreate,
+      canRead,
+      canUpdate,
+      canDelete,
+      canToggleStatus
+    });
+
+    console.log('🔐 Permisos del usuario en módulo Sectores:', {
+      canCreate,
+      canRead,
+      canUpdate,
+      canDelete
+    });
+  };
+
   // Fetch sectors
   const fetchSectors = useCallback(async () => {
+    // 🔑 Verificar si tiene permiso de lectura
+    if (!permissions.canRead) {
+      setError('No tienes permiso para ver sectores');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
@@ -48,12 +104,14 @@ const SectorsSection = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearchTerm]);
+  }, [debouncedSearchTerm, permissions.canRead]);
 
   useEffect(() => {
-    console.log('🔄 Componente montado, cargando sectores...');
-    fetchSectors();
-  }, [fetchSectors]);
+    if (permissions.canRead) {
+      console.log('🔄 Componente montado, cargando sectores...');
+      fetchSectors();
+    }
+  }, [fetchSectors, permissions.canRead]);
 
   // Debounce search
   useEffect(() => {
@@ -62,6 +120,12 @@ const SectorsSection = () => {
     }, 700);
     return () => clearTimeout(handler);
   }, [searchTerm]);
+
+  useEffect(() => {
+    if (permissions.canRead) {
+      fetchSectors();
+    }
+  }, [debouncedSearchTerm, fetchSectors, permissions.canRead]);
 
   // Filter sectors
   const filteredSectors = sectors.filter(sector => {
@@ -78,6 +142,16 @@ const SectorsSection = () => {
   });
 
   const openModal = (type, sector = null) => {
+    // 🔑 Verificar permisos antes de abrir modal
+    if (type === 'create' && !permissions.canCreate) {
+      alert('❌ No tienes permiso para crear sectores');
+      return;
+    }
+    if (type === 'edit' && !permissions.canUpdate) {
+      alert('❌ No tienes permiso para editar sectores');
+      return;
+    }
+
     setModalType(type);
     setSelectedSector(sector);
     setError(null);
@@ -113,6 +187,11 @@ const SectorsSection = () => {
       let result;
 
       if (modalType === 'create') {
+        if (!permissions.canCreate) {
+          setError('No tienes permiso para crear sectores');
+          return;
+        }
+
         result = await sectorsService.createSector(formData);
 
         if (result.success) {
@@ -124,6 +203,11 @@ const SectorsSection = () => {
         }
 
       } else if (modalType === 'edit') {
+        if (!permissions.canUpdate) {
+          setError('No tienes permiso para editar sectores');
+          return;
+        }
+
         result = await sectorsService.updateSector(selectedSector.id_sector, formData);
         
         if (result.success) {
@@ -142,6 +226,12 @@ const SectorsSection = () => {
   };
 
   const handleDelete = async (sectorId) => {
+    // 🔑 Verificar permiso antes de eliminar
+    if (!permissions.canDelete) {
+      alert('❌ No tienes permiso para eliminar sectores');
+      return;
+    }
+
     if (window.confirm('¿Estás seguro de que deseas eliminar este sector?')) {
       try {
         const result = await sectorsService.deleteSector(sectorId);
@@ -159,6 +249,12 @@ const SectorsSection = () => {
   };
 
   const toggleSectorStatus = async (sectorId) => {
+    // 🔑 Verificar permiso antes de cambiar estado
+    if (!permissions.canToggleStatus) {
+      alert('❌ No tienes permiso para cambiar el estado de sectores');
+      return;
+    }
+
     try {
       const result = await sectorsService.toggleSectorStatus(sectorId);
       
@@ -171,6 +267,17 @@ const SectorsSection = () => {
       alert('Error al cambiar estado del sector');
     }
   };
+
+  // 🔑 Mostrar mensaje si no tiene permiso de lectura
+  if (!permissions.canRead) {
+    return (
+      <div className="section-placeholder">
+        <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-400" />
+        <h2>Acceso Denegado</h2>
+        <p>No tienes permiso para acceder al módulo de sectores.</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -203,13 +310,16 @@ const SectorsSection = () => {
           <Map className="w-6 h-6 text-blue-600" />
           <h2>Gestión de Sectores</h2>
         </div>
-        <button 
-          className="btn-primary"
-          onClick={() => openModal('create')}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Sector
-        </button>
+        {/* 🔑 Botón "Nuevo Sector" solo si tiene permiso de crear */}
+        {permissions.canCreate && (
+          <button 
+            className="btn-primary"
+            onClick={() => openModal('create')}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Sector
+          </button>
+        )}
       </div>
 
       <div className="filters-section">
@@ -284,6 +394,7 @@ const SectorsSection = () => {
               </div>
               
               <div className="sector-actions">
+                {/* 🔑 Botón "Ver detalles" - siempre visible si tiene permiso de lectura */}
                 <button 
                   className="action-btn view"
                   onClick={() => openModal('view', sector)}
@@ -291,27 +402,39 @@ const SectorsSection = () => {
                 >
                   <Eye className="w-4 h-4 icon-view" />
                 </button>
-                <button 
-                  className="action-btn edit"
-                  onClick={() => openModal('edit', sector)}
-                  title="Editar sector"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button 
-                  className="action-btn toggle"
-                  onClick={() => toggleSectorStatus(sector.id_sector)}
-                  title={sector.activo ? 'Desactivar' : 'Activar'}
-                >
-                  {sector.activo ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                </button>
-                <button 
-                  className="action-btn delete"
-                  onClick={() => handleDelete(sector.id_sector)}
-                  title="Eliminar sector"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+
+                {/* 🔑 Botón "Editar" - solo si tiene permiso de actualizar */}
+                {permissions.canUpdate && (
+                  <button 
+                    className="action-btn edit"
+                    onClick={() => openModal('edit', sector)}
+                    title="Editar sector"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* 🔑 Botón "Activar/Desactivar" - solo si tiene permiso */}
+                {permissions.canToggleStatus && (
+                  <button 
+                    className="action-btn toggle"
+                    onClick={() => toggleSectorStatus(sector.id_sector)}
+                    title={sector.activo ? 'Desactivar' : 'Activar'}
+                  >
+                    {sector.activo ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                  </button>
+                )}
+
+                {/* 🔑 Botón "Eliminar" - solo si tiene permiso de eliminar */}
+                {permissions.canDelete && (
+                  <button 
+                    className="action-btn delete"
+                    onClick={() => handleDelete(sector.id_sector)}
+                    title="Eliminar sector"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
             

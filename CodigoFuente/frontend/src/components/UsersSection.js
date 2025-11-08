@@ -61,18 +61,20 @@ const UsersSection = () => {
   const loadUserPermissions = () => {
     // Verificar permisos sobre el módulo 'usuarios'
     const canCreate = authService.hasPermission('usuarios', 'crear') || 
-                     authService.hasPermission('usuarios', 'crud');
-    
-    const canRead = authService.hasPermission('usuarios', 'lectura') || 
-                   authService.hasPermission('usuarios', 'crud');
+                     authService.hasPermission('usuarios', 'operaciones crud');
     
     const canUpdate = authService.hasPermission('usuarios', 'actualizar') || 
-                     authService.hasPermission('usuarios', 'crud');
+                     authService.hasPermission('usuarios', 'operaciones crud');
     
     const canDelete = authService.hasPermission('usuarios', 'eliminar') || 
-                     authService.hasPermission('usuarios', 'crud');
-
-    // Permisos adicionales (puedes personalizarlos según tu sistema)
+                     authService.hasPermission('usuarios', 'operaciones crud');
+    
+    // ✅ Si puede crear, actualizar o eliminar, también debe poder leer
+    const canRead = authService.hasPermission('usuarios', 'lectura') ||
+               canCreate || canUpdate || canDelete ||
+               authService.hasPermission('usuarios', 'operaciones crud');
+    
+    // Permisos adicionales 
     const canChangePassword = canUpdate; // Cambiar contraseña requiere actualizar
     const canChangePhoto = canUpdate; // Cambiar foto requiere actualizar
     const canToggleStatus = canUpdate; // Cambiar estado requiere actualizar

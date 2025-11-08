@@ -16,6 +16,8 @@ import ChangePasswordModal from '../../components/ChangePasswordModal';
 import ProfileSection from '../../components/ProfileSection';
 import NotificationsSection from '../../components/NotificationsSection';
 import UsersSection from '../../components/UsersSection';
+import RolesSection from '../../components/RolesSection';
+import SectorsSection from '../../components/SectorsSection';
 
 
 // Importar iconos
@@ -40,7 +42,9 @@ import {
 const componentMap = {
   UsersSection,
   ProfileSection,
-  NotificationsSection
+  NotificationsSection,
+  RolesSection,
+  SectorsSection
 };
 
 const LectorDashboard = () => {

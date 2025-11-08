@@ -30,6 +30,15 @@ import {
   Users, DollarSign, Activity, Shield
 } from 'lucide-react';
 
+// 📦 Mapeo de componentes dinámicos para módulos del lector
+const componentMap = {
+  UsersSection,
+  RolesSection,
+  ProfileSection,
+  SectorsSection,
+  NotificationsSection
+};
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('overview');
@@ -612,47 +621,52 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* Profile Section */}
-          {activeSection === 'profile' && (
-            <ProfileSection 
-              user={user}
-              onUpdateProfile={handleUpdateProfile}
-            />
-          )}
+          {/* Secciones dinámicas del sistema */}
+          {activeSection !== 'overview' && (() => {
+            // Buscar el módulo activo según el ID
+            const activeModule = organizedModules
+              .flatMap(cat => cat.modules)
+              .find(mod => mod.id === activeSection);
 
-          {/* Users Section */}
-          {activeSection === 'users' && (
-            <UsersSection />
-          )}
+            if (!activeModule) {
+              // Si no existe, revisar si es una sección fija (perfil o notificaciones)
+              if (activeSection === 'profile') {
+                return <ProfileSection user={user} onUpdateProfile={handleUpdateProfile} />;
+              }
+              if (activeSection === 'notifications') {
+                return (
+                  <NotificationsSection 
+                    notifications={notifications}
+                    onMarkAsRead={handleMarkAsRead}
+                  />
+                );
+              }
 
-          {/* Invoices Section */}
-          {activeSection === 'invoices' && (
-            <InvoicesSection />
-          )}
+              // Si no está definida, mostrar mensaje genérico
+              return (
+                <div className="section-placeholder">
+                  <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <h2>Módulo en Desarrollo</h2>
+                  <p>Esta sección estará disponible próximamente.</p>
+                </div>
+              );
+            }
 
-          {/* Role Section */}
-          {activeSection === 'roles' && (
-            <RolesSection />
-          )}
+            // Si el módulo existe y tiene un componente definido
+            const Component = componentMap[activeModule.componentName];
+            if (Component) {
+              return <Component user={user} />;
+            }
 
-          {/* Sectors Section */}
-          {activeSection === 'sectors' && (
-            <SectorsSection />
-          )}
-
-          {/* notificacion page */}
-          {activeSection === 'notifications' && (
-            <NotificationsSection />
-          )}
-
-          {/* Secciones genéricas para otros módulos */}
-          {!['overview', 'profile', 'users', 'invoices', 'roles', 'sectors'].includes(activeSection) && (
-            <div className="section-placeholder">
-              <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Módulo en Desarrollo</h2>
-              <p>Esta sección estará disponible próximamente.</p>
-            </div>
-          )}
+            // Si no hay componente vinculado
+            return (
+              <div className="section-placeholder">
+                <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                <h2>{activeModule.label}</h2>
+                <p>Componente no vinculado o en desarrollo.</p>
+              </div>
+            );
+          })()}
         </main>
       </div>
 

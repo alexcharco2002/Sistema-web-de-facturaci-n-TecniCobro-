@@ -1,11 +1,16 @@
 # routes/sectors.py
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from psycopg2.errors import ForeignKeyViolation
 from typing import List, Optional
 from models.sector import Sector
 from models.user import UsuarioSistema
-from models.role import Rol
+from models.role import RolAccion
 from schemas.sector import SectorCreate, SectorUpdate, SectorResponse
+from schemas.notification import NotificacionCreate
+from utils.notifications import registrar_notificacion
+from utils.audit_logger import registrar_auditoria
 from db.session import SessionLocal
 from security.jwt import verify_token
 
@@ -19,27 +24,83 @@ def get_db():
     finally:
         db.close()
 
-def verificar_es_admin(payload: dict, db: Session):
-    """Verifica que el usuario sea administrador"""
-    db_user = db.query(UsuarioSistema).filter(
+# ============================================================================
+# HELPER: Obtener usuario actual desde el token
+# ============================================================================
+def get_current_user(payload: dict, db: Session) -> UsuarioSistema:
+    """Obtiene el usuario actual desde el payload del JWT"""
+    user = db.query(UsuarioSistema).filter(
         UsuarioSistema.usuario == payload["sub"]
     ).first()
     
-    if not db_user or not db_user.id_rol:
-        raise HTTPException(status_code=403, detail="No autorizado")
-    
-    rol = db.query(Rol).filter(
-        Rol.id_rol == db_user.id_rol,
-        Rol.nombre_rol == "Administrador"
-    ).first()
-    
-    if not rol:
+    if not user:
         raise HTTPException(
-            status_code=403, 
-            detail="No tienes permisos de administrador"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario no encontrado"
         )
     
-    return True
+    return user
+
+# ============================================================================
+# HELPER: Verificar permisos de usuario
+# ============================================================================
+def check_permission(user: UsuarioSistema, db: Session, module: str, action: str = None) -> bool:
+    """
+    Verifica si el usuario tiene permiso para una acción.
+
+    Si el usuario tiene permiso de crear, actualizar o eliminar, 
+    automáticamente también se le concede permiso de lectura.
+    """
+    # Normalizar
+    module = module.lower().strip()
+    action = action.lower().strip() if action else None
+
+    permisos = db.query(RolAccion).filter(
+        RolAccion.id_rol == user.id_rol,
+        RolAccion.activo == True
+    ).all()
+
+    # Determinar todas las acciones que el usuario tiene sobre el módulo
+    acciones_usuario = set()
+
+    for permiso in permisos:
+        if not permiso.nombre_accion:
+            continue
+
+        perm_module = permiso.nombre_accion.lower().strip()
+        perm_action = (permiso.tipo_accion or '').lower().strip()
+
+        if perm_module != module:
+            continue
+
+        if perm_action in ['crud', 'operaciones crud']:
+            # Acceso completo
+            return True
+
+        acciones_usuario.add(perm_action)
+
+    # ✅ Si no se pide acción específica, basta con que tenga cualquier permiso
+    if action is None:
+        return bool(acciones_usuario)
+
+    # ✅ Si la acción es "lectura", damos acceso si tiene lectura o cualquier otro CRUD
+    if action in ['leer', 'lectura']:
+        if any(a in acciones_usuario for a in ['lectura', 'leer', 'crear', 'actualizar', 'eliminar']):
+            return True
+
+    # ✅ Caso normal: la acción debe coincidir exactamente
+    return action in acciones_usuario
+
+
+def require_permission(user: UsuarioSistema, db: Session, module: str, action: str = None):
+    """
+    Verifica permiso y lanza excepción si no lo tiene
+    """
+    if not check_permission(user, db, module, action):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"No tienes permisos para {action or 'acceder a'} {module}"
+        )
 
 # ========================================
 # CRUD SECTORES
@@ -56,7 +117,12 @@ def listar_sectores(
 ):
     """
     Lista todos los sectores con filtros opcionales
+    Requiere permiso: sectores.lectura o sectores.crud
     """
+    # Obtener usuario actual y verificar permisos
+    current_user = get_current_user(payload, db)
+    require_permission(current_user, db, "sectores", "lectura")
+    
     query = db.query(Sector)
     
     # Filtro de búsqueda
@@ -87,12 +153,16 @@ def obtener_sector(
 ):
     """
     Obtiene un sector específico por ID
+    Requiere permiso: sectores.lectura o sectores.crud
     """
+    current_user = get_current_user(payload, db)
+    require_permission(current_user, db, "sectores", "lectura")
+    
     sector = db.query(Sector).filter(Sector.id_sector == id_sector).first()
     
     if not sector:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Sector no encontrado"
         )
     
@@ -105,9 +175,11 @@ def crear_sector(
     payload: dict = Depends(verify_token)
 ):
     """
-    Crea un nuevo sector - Solo admin
+    Crea un nuevo sector
+    Requiere permiso: sectores.crear o sectores.crud
     """
-    verificar_es_admin(payload, db)
+    current_user = get_current_user(payload, db)
+    require_permission(current_user, db, "sectores", "crear")
     
     # Verificar que no exista un sector con el mismo nombre
     existe = db.query(Sector).filter(
@@ -116,17 +188,44 @@ def crear_sector(
     
     if existe:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Ya existe un sector con el nombre '{sector.nombre_sector}'"
         )
     
     # Crear nuevo sector
     nuevo_sector = Sector(**sector.model_dump())
-    db.add(nuevo_sector)
-    db.commit()
-    db.refresh(nuevo_sector)
     
-    return nuevo_sector
+    try:
+        db.add(nuevo_sector)
+        db.commit()
+        db.refresh(nuevo_sector)
+        
+        # ✅ Registrar auditoría
+        registrar_auditoria(
+            db=db,
+            accion="CREATE",
+            descripcion=f"Sector '{nuevo_sector.nombre_sector}' creado por '{payload['sub']}'",
+            id_usuario=current_user.id_usuario_sistema
+        )
+        
+        # ✅ Crear notificación
+        registrar_notificacion(
+            db=db,
+            id_usuario=current_user.id_usuario_sistema,
+            titulo="Sector creado",
+            mensaje=f"El sector '{nuevo_sector.nombre_sector}' fue creado correctamente.",
+            tipo="success"
+        )
+        
+        return nuevo_sector
+    
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error al crear sector: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al crear el sector: {str(e)}"
+        )
 
 @router.put("/{id_sector}", response_model=SectorResponse)
 def actualizar_sector(
@@ -136,16 +235,18 @@ def actualizar_sector(
     payload: dict = Depends(verify_token)
 ):
     """
-    Actualiza un sector existente - Solo admin
+    Actualiza un sector existente
+    Requiere permiso: sectores.actualizar o sectores.crud
     """
-    verificar_es_admin(payload, db)
+    current_user = get_current_user(payload, db)
+    require_permission(current_user, db, "sectores", "actualizar")
     
     # Buscar el sector
     sector = db.query(Sector).filter(Sector.id_sector == id_sector).first()
     
     if not sector:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Sector no encontrado"
         )
     
@@ -158,7 +259,7 @@ def actualizar_sector(
         
         if existe:
             raise HTTPException(
-                status_code=400,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Ya existe otro sector con el nombre '{sector_update.nombre_sector}'"
             )
     
@@ -167,53 +268,142 @@ def actualizar_sector(
     for key, value in update_data.items():
         setattr(sector, key, value)
     
-    db.commit()
-    db.refresh(sector)
+    try:
+        db.commit()
+        db.refresh(sector)
+        
+        # ✅ Registrar auditoría
+        registrar_auditoria(
+            db=db,
+            accion="UPDATE",
+            descripcion=f"Sector '{sector.nombre_sector}' actualizado por '{payload['sub']}'",
+            id_usuario=current_user.id_usuario_sistema
+        )
+        
+        # ✅ Crear notificación
+        registrar_notificacion(
+            db=db,
+            id_usuario=current_user.id_usuario_sistema,
+            titulo="Sector modificado",
+            mensaje=f"El sector '{sector.nombre_sector}' fue modificado correctamente.",
+            tipo="info"
+        )
+        
+        return sector
     
-    return sector
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error al actualizar sector: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al actualizar el sector"
+        )
 
-@router.delete("/{id_sector}")
+@router.delete("/{id_sector}", status_code=status.HTTP_200_OK)
 def eliminar_sector(
     id_sector: int,
     db: Session = Depends(get_db),
     payload: dict = Depends(verify_token)
 ):
     """
-    Desactiva un sector (soft delete) - Solo admin
-    
-    Si necesitas verificar que no haya medidores asociados antes de eliminar,
-    descomenta el bloque de verificación
+    Elimina el sector si no tiene relaciones.
+    Si tiene relaciones (medidores, afiliados, etc.), lo desactiva (borrado lógico).
+    Requiere permiso: sectores.eliminar o sectores.crud
     """
-    verificar_es_admin(payload, db)
+    current_user = get_current_user(payload, db)
+    require_permission(current_user, db, "sectores", "eliminar")
     
     sector = db.query(Sector).filter(Sector.id_sector == id_sector).first()
     
     if not sector:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Sector no encontrado"
         )
     
-    # ⚠️ OPCIONAL: Descomentar si tienes tabla de medidores relacionada
-    # from models.medidor import Medidor
-    # medidores_en_sector = db.query(Medidor).filter(
-    #     Medidor.id_sector == id_sector
-    # ).count()
-    # 
-    # if medidores_en_sector > 0:
-    #     raise HTTPException(
-    #         status_code=400,
-    #         detail=f"No se puede eliminar el sector. Hay {medidores_en_sector} medidor(es) en este sector"
-    #     )
+    try:
+        # ✅ Intentar eliminar físicamente
+        db.delete(sector)
+        db.commit()
+        
+        # Auditoría
+        registrar_auditoria(
+            db=db,
+            accion="DELETE",
+            descripcion=f"Sector '{sector.nombre_sector}' eliminado por '{payload['sub']}'",
+            id_usuario=current_user.id_usuario_sistema
+        )
+        
+        # Notificación
+        registrar_notificacion(
+            db=db,
+            id_usuario=current_user.id_usuario_sistema,
+            titulo="Sector eliminado",
+            mensaje=f"El sector '{sector.nombre_sector}' fue eliminado correctamente.",
+            tipo="info"
+        )
+        
+        return {
+            "success": True,
+            "message": f"Sector '{sector.nombre_sector}' eliminado correctamente.",
+            "accion": "eliminado"
+        }
     
-    # Soft delete: desactivar en lugar de eliminar
-    sector.activo = False
-    db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        
+        # ✅ Si es por relación de clave foránea, desactivar
+        if isinstance(e.orig, ForeignKeyViolation):
+            print(f"⚠️ No se puede eliminar por relaciones, se desactiva el sector: {e}")
+            
+            if not sector.activo:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El sector '{sector.nombre_sector}' ya está inactivo."
+                )
+            
+            sector.activo = False
+            db.commit()
+            db.refresh(sector)
+            
+            # Auditoría
+            registrar_auditoria(
+                db=db,
+                accion="UPDATE",
+                descripcion=f"Sector '{sector.nombre_sector}' fue desactivado (por relaciones) por '{payload['sub']}'",
+                id_usuario=current_user.id_usuario_sistema
+            )
+            
+            # Notificación
+            registrar_notificacion(
+                db=db,
+                id_usuario=current_user.id_usuario_sistema,
+                titulo="Sector desactivado",
+                mensaje=f"El sector '{sector.nombre_sector}' no se pudo eliminar porque está relacionado con otros módulos (medidores, afiliados, etc.). Fue desactivado automáticamente.",
+                tipo="alerta"
+            )
+            
+            return {
+                "success": True,
+                "message": f"⚠️ El sector '{sector.nombre_sector}' no se pudo eliminar porque tiene relación con otros módulos, por lo que fue desactivado automáticamente.",
+                "accion": "desactivado",
+                "sector": SectorResponse.model_validate(sector)
+            }
+        
+        # Otros errores no esperados
+        print(f"Error inesperado al eliminar sector: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al intentar eliminar el sector"
+        )
     
-    return {
-        "success": True,
-        "message": "Sector desactivado correctamente"
-    }
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error al eliminar sector: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al eliminar el sector"
+        )
 
 @router.patch("/{id_sector}/toggle-status", response_model=SectorResponse)
 def toggle_sector_status(
@@ -222,27 +412,48 @@ def toggle_sector_status(
     payload: dict = Depends(verify_token)
 ):
     """
-    Activa/Desactiva un sector - Solo admin
+    Activa/Desactiva un sector
+    Requiere permiso: sectores.actualizar o sectores.crud
     """
-    verificar_es_admin(payload, db)
+    current_user = get_current_user(payload, db)
+    require_permission(current_user, db, "sectores", "actualizar")
     
     sector = db.query(Sector).filter(Sector.id_sector == id_sector).first()
     
     if not sector:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Sector no encontrado"
         )
     
-    # Toggle del estado
+    # Cambiar estado
     sector.activo = not sector.activo
-    db.commit()
-    db.refresh(sector)
+    estado_texto = "activado" if sector.activo else "desactivado"
     
-    return sector
+    try:
+        db.commit()
+        db.refresh(sector)
+        
+        # ✅ Registrar auditoría
+        registrar_auditoria(
+            db=db,
+            accion="UPDATE",
+            descripcion=f"Sector '{sector.nombre_sector}' fue {estado_texto} por '{payload['sub']}'",
+            id_usuario=current_user.id_usuario_sistema
+        )
+        
+        return sector
+    
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error al cambiar estado del sector: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al cambiar el estado del sector"
+        )
 
 # ========================================
-# ENDPOINTS ADICIONALES (OPCIONAL)
+# ENDPOINTS ADICIONALES
 # ========================================
 
 @router.get("/stats/count")
@@ -252,7 +463,11 @@ def obtener_estadisticas_sectores(
 ):
     """
     Obtiene estadísticas de sectores
+    Requiere permiso: sectores.lectura o sectores.crud
     """
+    current_user = get_current_user(payload, db)
+    require_permission(current_user, db, "sectores", "lectura")
+    
     total = db.query(Sector).count()
     activos = db.query(Sector).filter(Sector.activo == True).count()
     inactivos = db.query(Sector).filter(Sector.activo == False).count()

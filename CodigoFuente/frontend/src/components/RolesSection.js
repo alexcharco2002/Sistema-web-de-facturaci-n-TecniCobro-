@@ -2,12 +2,13 @@
 /**
  * Componente para la gestión de roles y permisos del sistema
  * Permite crear, editar, eliminar roles y asignarles permisos específicos
+ * Con control de permisos granular
 */
 import React, { useState, useEffect } from 'react';
-import './styleRoles.css'; // Estilos específicos para RolesSection
+import './styleRoles.css';
 
-
-import rolesService from '../services/rolesServices'; // Servicio para llamadas API relacionadas con roles
+import rolesService from '../services/rolesServices';
+import authService from '../services/authServices'; // 🔑 Importar authService
 
 import {
   Shield,
@@ -32,8 +33,8 @@ import {
 // COMPONENTE PRINCIPAL
 // ============================================
 const RolesSection = () => {
-  const [roles, setRoles] = useState([]); // Lista de roles
-  const [selectedRole, setSelectedRole] = useState(null); // Rol seleccionado
+  const [roles, setRoles] = useState([]);
+  const [selectedRole, setSelectedRole] = useState(null);
   const [roleActions, setRoleActions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingActions, setLoadingActions] = useState(false);
@@ -42,7 +43,7 @@ const RolesSection = () => {
   const [modalType, setModalType] = useState('create');
   const [selectedAction, setSelectedAction] = useState(null);
   const [error, setError] = useState(null);
-  const [editingRoleId, setEditingRoleId] = useState(null)
+  const [editingRoleId, setEditingRoleId] = useState(null);
   
   const [roleFormData, setRoleFormData] = useState({
     nombre_rol: '',
@@ -56,6 +57,15 @@ const RolesSection = () => {
     activo: true
   });
 
+  // 🔑 PERMISOS DEL USUARIO ACTUAL
+  const [permissions, setPermissions] = useState({
+    canCreate: false,
+    canRead: false,
+    canUpdate: false,
+    canDelete: false,
+    canToggleStatus: false
+  });
+
   const tiposAccion = [
     { value: 'Operaciones CRUD', label: 'Todas los permisos (Lectura, Crear, Actualizar y Eliminar)' },
     { value: 'Lectura', label: 'Lectura' },
@@ -64,42 +74,72 @@ const RolesSection = () => {
     { value: 'Eliminar', label: 'Eliminar' }
   ];
 
-
   const modulosSistema = [
-    // 🧍‍♂️ Usuarios
     { value: 'Usuarios', label: 'Usuarios' },
-   
-    // 🔐 Roles y Permiso
     { value: 'Roles', label: 'Roles' },
-
-    // 👥 Afiliados
     { value: 'Afiliados', label: 'Afiliados' },
-
-    // 📊 Lecturas
+    { value: 'Sectores', label: 'Sectores' },
     { value: 'Lecturas', label: 'Lecturas' },
-
-    // 🧾 Facturas
     { value: 'Facturas', label: 'Facturas' },
-
-    // 💰 Pagos
     { value: 'Pagos', label: 'Pagos' },
-
-    // ⚠️ Multas
     { value: 'Multas', label: 'Multas' },
-
-    // ⚙️ Configuración
     { value: 'Configuracion', label: 'Configuración' },
-
-    // notificaciones
     { value: 'Notificaciones', label: 'Notificaciones' },
   ];
 
-
+  // 🔑 Cargar permisos al montar el componente
   useEffect(() => {
-    fetchRoles();
+    loadUserPermissions();
   }, []);
 
+  const loadUserPermissions = () => {
+    // Verificar permisos sobre el módulo 'roles'
+    const canCreate = authService.hasPermission('roles', 'crear') || 
+                     authService.hasPermission('roles', 'crud');
+    
+    const canUpdate = authService.hasPermission('roles', 'actualizar') || 
+                     authService.hasPermission('roles', 'crud');
+    
+    const canDelete = authService.hasPermission('roles', 'eliminar') || 
+                     authService.hasPermission('roles', 'crud');
+    
+    // ✅ Si puede crear, actualizar o eliminar, también debe poder leer
+    const canRead = authService.hasPermission('usuarios', 'lectura') ||
+               canCreate || canUpdate || canDelete ||
+               authService.hasPermission('usuarios', 'operaciones crud');
+    // Permisos adicionales
+    const canToggleStatus = canUpdate; // Cambiar estado requiere actualizar
+
+    setPermissions({
+      canCreate,
+      canRead,
+      canUpdate,
+      canDelete,
+      canToggleStatus
+    });
+
+    console.log('🔐 Permisos del usuario en módulo Roles:', {
+      canCreate,
+      canRead,
+      canUpdate,
+      canDelete
+    });
+  };
+
+  useEffect(() => {
+    if (permissions.canRead) {
+      fetchRoles();
+    }
+  }, [permissions.canRead]);
+
   const fetchRoles = async () => {
+    // 🔑 Verificar si tiene permiso de lectura
+    if (!permissions.canRead) {
+      setError('No tienes permiso para ver roles');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
@@ -146,14 +186,23 @@ const RolesSection = () => {
     fetchRoleActions(role.id_rol);
   };
 
-  // Reemplaza la función openModal completa:
   const openModal = (type, item = null) => {
+    // 🔑 Verificar permisos antes de abrir modal
+    if ((type === 'create-role' || type === 'create-action') && !permissions.canCreate) {
+      alert('❌ No tienes permiso para crear roles o acciones');
+      return;
+    }
+    if ((type === 'edit-role' || type === 'edit-action') && !permissions.canUpdate) {
+      alert('❌ No tienes permiso para editar roles o acciones');
+      return;
+    }
+
     console.log('openModal llamado con:', { type, item });
     setModalType(type);
     setError(null);
     
     if (type === 'create-role') {
-      setEditingRoleId(null); // ✅ Limpiar ID al crear
+      setEditingRoleId(null);
       setRoleFormData({
         nombre_rol: '',
         descripcion: '',
@@ -162,27 +211,26 @@ const RolesSection = () => {
       setShowModal(true);
     } else if (type === 'edit-role' && item) {
       console.log('Abriendo modal de edición para rol:', item);
-      setEditingRoleId(item.id_rol); // ✅ Establecer ID del rol que se está editando
-      // ✅ FIX: Cargar los datos del rol correctamente
+      setEditingRoleId(item.id_rol);
       setRoleFormData({
         nombre_rol: item.nombre_rol,
         descripcion: item.descripcion || '',
-        activo: item.activo // ⚠️ El backend usa 'activo', no 'activo'
+        activo: item.activo
       });
       setShowModal(true);
     } else if (type === 'create-action') {
       setActionFormData({
         nombre_accion: '',
-        tipo_accion: '',
+        tipo_accion: 'Operaciones CRUD',
         activo: true
       });
       setShowModal(true);
     } else if (type === 'edit-action' && item) {
-      setSelectedAction(item); // ✅ Establecer la acción que se está editando
+      setSelectedAction(item);
       setActionFormData({
-      nombre_accion: item.nombre_accion,
-      tipo_accion: item.tipo_accion,
-      activo: item.activo
+        nombre_accion: item.nombre_accion,
+        tipo_accion: item.tipo_accion,
+        activo: item.activo
       });
       setShowModal(true);
     }
@@ -192,17 +240,17 @@ const RolesSection = () => {
     setShowModal(false);
     setError(null);
     setSelectedAction(null);
-    setEditingRoleId(null); // ✅ Limpiar ID al cerrar
+    setEditingRoleId(null);
     setRoleFormData({
-    nombre_rol: '',
-    descripcion: '',
-    activo: true
-  });
-  setActionFormData({
-    nombre_accion: '',
-    tipo_accion: 'Operaciones CRUD',
-    activo: true
-  });
+      nombre_rol: '',
+      descripcion: '',
+      activo: true
+    });
+    setActionFormData({
+      nombre_accion: '',
+      tipo_accion: 'Operaciones CRUD',
+      activo: true
+    });
   };
 
   const handleSubmitRole = async (e) => {
@@ -211,21 +259,27 @@ const RolesSection = () => {
     
     console.log('🔍 Modal Type:', modalType);
     console.log('🔍 Editing Role ID:', editingRoleId);
-    console.log('🔍 Selected Role:', selectedRole);
     console.log('🔍 Form Data:', roleFormData);
     
     try {
       let result;
 
       if (modalType === 'create-role') {
+        if (!permissions.canCreate) {
+          setError('No tienes permiso para crear roles');
+          return;
+        }
         result = await rolesService.createRole(roleFormData);
       } else if (modalType === 'edit-role') {
+        if (!permissions.canUpdate) {
+          setError('No tienes permiso para editar roles');
+          return;
+        }
         if (!editingRoleId) {
           setError('No hay un rol seleccionado para editar');
           return;
         }
         console.log('📝 Actualizando rol con ID:', editingRoleId);
-        // ✅ USAR editingRoleId
         result = await rolesService.updateRole(editingRoleId, roleFormData);
       }
 
@@ -249,7 +303,6 @@ const RolesSection = () => {
     }
   };
 
-
   const handleSubmitAction = async (e) => {
     e.preventDefault();
     setError(null);
@@ -263,8 +316,16 @@ const RolesSection = () => {
       let result;
 
       if (modalType === 'create-action') {
+        if (!permissions.canCreate) {
+          setError('No tienes permiso para crear acciones');
+          return;
+        }
         result = await rolesService.createRoleAction(selectedRole.id_rol, actionFormData);
       } else if (modalType === 'edit-action' && selectedAction) {
+        if (!permissions.canUpdate) {
+          setError('No tienes permiso para editar acciones');
+          return;
+        }
         result = await rolesService.updateRoleAction(selectedAction.id_rol_accion, actionFormData);
       }
 
@@ -282,6 +343,12 @@ const RolesSection = () => {
   };
 
   const handleDeleteRole = async (roleId) => {
+    // 🔑 Verificar permiso antes de eliminar
+    if (!permissions.canDelete) {
+      alert('❌ No tienes permiso para eliminar roles');
+      return;
+    }
+
     if (!window.confirm('¿Está seguro de eliminar este rol? Esta acción eliminará todas sus acciones asociadas.')) {
       return;
     }
@@ -305,6 +372,12 @@ const RolesSection = () => {
   };
 
   const handleDeleteAction = async (actionId) => {
+    // 🔑 Verificar permiso antes de eliminar
+    if (!permissions.canDelete) {
+      alert('❌ No tienes permiso para eliminar acciones');
+      return;
+    }
+
     if (!window.confirm('¿Está seguro de eliminar esta acción?')) {
       return;
     }
@@ -324,6 +397,12 @@ const RolesSection = () => {
   };
 
   const handleToggleActionStatus = async (actionId) => {
+    // 🔑 Verificar permiso antes de cambiar estado
+    if (!permissions.canToggleStatus) {
+      alert('❌ No tienes permiso para cambiar el estado de acciones');
+      return;
+    }
+
     try {
       const result = await rolesService.toggleActionStatus(actionId);
       
@@ -333,7 +412,7 @@ const RolesSection = () => {
         alert('Error: ' + result.message);
       }
     } catch (error) {
-      alert('Error al cambiar activo');
+      alert('Error al cambiar estado');
     }
   };
 
@@ -348,6 +427,17 @@ const RolesSection = () => {
     totalAcciones: roleActions.length,
     accionesActivas: roleActions.filter(a => a.activo).length
   };
+
+  // 🔑 Mostrar mensaje si no tiene permiso de lectura
+  if (!permissions.canRead) {
+    return (
+      <div className="section-placeholder">
+        <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-400" />
+        <h2>Acceso Denegado</h2>
+        <p>No tienes permiso para acceder al módulo de roles.</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -381,13 +471,16 @@ const RolesSection = () => {
           <Shield className="w-6 h-6 text-blue-600" />
           <h2>Gestión de Roles y Permisos</h2>
         </div>
-        <button 
-          className="btn-primary"
-          onClick={() => openModal('create-role')}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Rol
-        </button>
+        {/* 🔑 Botón "Nuevo Rol" solo si tiene permiso de crear */}
+        {permissions.canCreate && (
+          <button 
+            className="btn-primary"
+            onClick={() => openModal('create-role')}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Rol
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -479,26 +572,32 @@ const RolesSection = () => {
                   <div className="role-item-header">
                     <div className="role-item-title">{role.nombre_rol}</div>
                     <div className="role-item-actions">
-                      <button
-                        className="action-btn edit"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openModal('edit-role', role ); // Pasar el rol directamente
-                        }}
-                        title="Editar rol"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        className="action-btn delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteRole(role.id_rol);
-                        }}
-                        title="Eliminar rol"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* 🔑 Botón "Editar" - solo si tiene permiso de actualizar */}
+                      {permissions.canUpdate && (
+                        <button
+                          className="action-btn edit"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openModal('edit-role', role);
+                          }}
+                          title="Editar rol"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+                      {/* 🔑 Botón "Eliminar" - solo si tiene permiso de eliminar */}
+                      {permissions.canDelete && (
+                        <button
+                          className="action-btn delete"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteRole(role.id_rol);
+                          }}
+                          title="Eliminar rol"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   
@@ -536,13 +635,16 @@ const RolesSection = () => {
                     {roleActions.length} {roleActions.length === 1 ? 'permiso configurado' : 'permisos configurados'}
                   </p>
                 </div>
-                <button
-                  className="btn-primary"
-                  onClick={() => openModal('create-action')}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nueva Acción
-                </button>
+                {/* 🔑 Botón "Nueva Acción" solo si tiene permiso de crear */}
+                {permissions.canCreate && (
+                  <button
+                    className="btn-primary"
+                    onClick={() => openModal('create-action')}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nueva Acción
+                  </button>
+                )}
               </div>
 
               {loadingActions ? (
@@ -555,13 +657,15 @@ const RolesSection = () => {
                   <Lock className="w-16 h-16 text-gray-300 mx-auto mb-2" />
                   <h3>Sin permisos asignados</h3>
                   <p>Este rol no tiene permisos configurados aún.</p>
-                  <button
-                    className="btn-primary mt-4"
-                    onClick={() => openModal('create-action')}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Agregar Primer Permiso
-                  </button>
+                  {permissions.canCreate && (
+                    <button
+                      className="btn-primary mt-4"
+                      onClick={() => openModal('create-action')}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Agregar Primer Permiso
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="actions-grid">
@@ -576,27 +680,36 @@ const RolesSection = () => {
                           <div className="action-type">{action.tipo_accion}</div>
                         </div>
                         <div className="action-buttons">
-                          <button
-                            className="action-btn toggle"
-                            onClick={() => handleToggleActionStatus(action.id_rol_accion)}
-                            title={action.activo ? 'Desactivar' : 'Activar'}
-                          >
-                            {action.activo ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                          </button>
-                          <button
-                            className="action-btn edit"
-                            onClick={() => openModal('edit-action', action)}
-                            title="Editar acción"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            className="action-btn delete"
-                            onClick={() => handleDeleteAction(action.id_rol_accion)}
-                            title="Eliminar acción"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {/* 🔑 Botón "Toggle Status" - solo si tiene permiso */}
+                          {permissions.canToggleStatus && (
+                            <button
+                              className="action-btn toggle"
+                              onClick={() => handleToggleActionStatus(action.id_rol_accion)}
+                              title={action.activo ? 'Desactivar' : 'Activar'}
+                            >
+                              {action.activo ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                            </button>
+                          )}
+                          {/* 🔑 Botón "Editar" - solo si tiene permiso de actualizar */}
+                          {permissions.canUpdate && (
+                            <button
+                              className="action-btn edit"
+                              onClick={() => openModal('edit-action', action)}
+                              title="Editar acción"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          {/* 🔑 Botón "Eliminar" - solo si tiene permiso de eliminar */}
+                          {permissions.canDelete && (
+                            <button
+                              className="action-btn delete"
+                              onClick={() => handleDeleteAction(action.id_rol_accion)}
+                              title="Eliminar acción"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -686,7 +799,7 @@ const RolesSection = () => {
                     </div>
 
                     <div className="form-group form-group-full">
-                      <label>activo</label>
+                      <label>Estado</label>
                       <select
                         value={roleFormData.activo}
                         onChange={(e) => setRoleFormData({...roleFormData, activo: e.target.value === 'true'})}
@@ -745,12 +858,11 @@ const RolesSection = () => {
                             {tipo.label}
                           </option>
                         ))}
-
                       </select>
                     </div>
 
                     <div className="form-group form-group-full">
-                      <label>activo</label>
+                      <label>Estado</label>
                       <select
                         value={actionFormData.activo}
                         onChange={(e) => setActionFormData({...actionFormData, activo: e.target.value === 'true'})}

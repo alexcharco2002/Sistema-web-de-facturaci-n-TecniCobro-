@@ -58,53 +58,51 @@ def check_permission(user: UsuarioSistema, db: Session, module: str, action: str
     """
     Verifica si el usuario tiene permiso para una acción.
 
-    Args:
-        user: Usuario actual
-        db: Sesión de base de datos
-        module: Nombre del módulo (ej: 'usuarios', 'facturas')
-        action: Tipo de acción (ej: 'leer', 'crear', 'actualizar', 'eliminar', 'crud')
-
-    Returns:
-        True si tiene permiso, False si no
+    Si el usuario tiene permiso de crear, actualizar o eliminar, 
+    automáticamente también se le concede permiso de lectura.
     """
     from models.role import RolAccion
 
-    # Normalizar módulo y acción
+    # Normalizar
     module = module.lower().strip()
     action = action.lower().strip() if action else None
 
-    # Buscar permisos activos del rol del usuario
     permisos = db.query(RolAccion).filter(
         RolAccion.id_rol == user.id_rol,
         RolAccion.activo == True
     ).all()
 
+    # Determinar todas las acciones que el usuario tiene sobre el módulo
+    acciones_usuario = set()
+
     for permiso in permisos:
-        # Validar campos
         if not permiso.nombre_accion:
             continue
 
         perm_module = permiso.nombre_accion.lower().strip()
         perm_action = (permiso.tipo_accion or '').lower().strip()
 
-        # Si el módulo no coincide, continuar
         if perm_module != module:
             continue
 
-        # Si no se especifica acción, tener cualquier permiso sobre el módulo ya es suficiente
-        if action is None:
+        if perm_action in ['crud', 'operaciones crud']:
+            # Acceso completo
             return True
 
-        # Si el permiso tiene CRUD, da acceso total al módulo
-        if perm_action == 'crud' or perm_action == 'operaciones crud':
+        acciones_usuario.add(perm_action)
+
+    # ✅ Si no se pide acción específica, basta con que tenga cualquier permiso
+    if action is None:
+        return bool(acciones_usuario)
+
+    # ✅ Si la acción es "lectura", damos acceso si tiene lectura o cualquier otro CRUD
+    if action in ['leer', 'lectura']:
+        if any(a in acciones_usuario for a in ['lectura', 'leer', 'crear', 'actualizar', 'eliminar']):
             return True
 
-        # Si la acción coincide exactamente
-        if perm_action == action:
-            return True
+    # ✅ Caso normal: la acción debe coincidir exactamente
+    return action in acciones_usuario
 
-    # Si no se encontró coincidencia
-    return False
 
 
 def require_permission(user: UsuarioSistema, db: Session, module: str, action: str = None):
