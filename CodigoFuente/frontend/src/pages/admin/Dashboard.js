@@ -13,12 +13,12 @@ import { buildModulesFromPermissions } from '../../utils/modulesDefinitions';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import UserProfile from '../../components/UserProfile';
 import UsersSection from '../../components/UsersSection';
-import InvoicesSection from '../../components/InvoicesSection';
 import ProfileSection from '../../components/ProfileSection';
 import RolesSection from '../../components/RolesSection'; 
 import SectorsSection from '../../components/SectorsSection';
 import ChangePasswordModal from '../../components/ChangePasswordModal';
 import NotificationsSection  from '../../components/NotificationsSection';
+import AffiliatesSection from '../../components/AffiliatesSection';
 
 // Estilos
 import './style.css';
@@ -36,7 +36,8 @@ const componentMap = {
   RolesSection,
   ProfileSection,
   SectorsSection,
-  NotificationsSection
+  NotificationsSection,
+  AffiliatesSection
 };
 
 const AdminDashboard = () => {
@@ -131,7 +132,7 @@ const AdminDashboard = () => {
       setDataLoading(true);
       setDataError(null);
 
-      if (authService.hasPermission('usuarios', 'leer')) {
+      if (authService.hasPermission('usuarios', 'lectura')) {
         const result = await userService.getUsers({ limit: 1000 });
 
         if (result.success) {
@@ -343,7 +344,7 @@ const AdminDashboard = () => {
   }
 
   // Verificar si tiene acceso a estadísticas de usuarios
-  const canViewUserStats = authService.hasPermission('usuarios', 'leer');
+  const canViewUserStats = authService.hasPermission('usuarios', 'lectura');
 
   // Tarjetas de estadísticas (solo si tiene permisos)
   const statCards = canViewUserStats ? [

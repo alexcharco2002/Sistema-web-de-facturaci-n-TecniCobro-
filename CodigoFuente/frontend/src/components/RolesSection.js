@@ -4,7 +4,7 @@
  * Permite crear, editar, eliminar roles y asignarles permisos específicos
  * Con control de permisos granular
 */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './styleRoles.css';
 
 import rolesService from '../services/rolesServices';
@@ -126,13 +126,9 @@ const RolesSection = () => {
     });
   };
 
-  useEffect(() => {
-    if (permissions.canRead) {
-      fetchRoles();
-    }
-  }, [permissions.canRead]);
+  
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     // 🔑 Verificar si tiene permiso de lectura
     if (!permissions.canRead) {
       setError('No tienes permiso para ver roles');
@@ -158,8 +154,12 @@ const RolesSection = () => {
     } finally {
       setLoading(false);
     }
-  };
-
+  }, [permissions.canRead]);
+  useEffect(() => {
+    if (permissions.canRead) {
+      fetchRoles();
+    }
+  }, [permissions.canRead, fetchRoles]);
   const fetchRoleActions = async (roleId) => {
     setLoadingActions(true);
     setError(null);

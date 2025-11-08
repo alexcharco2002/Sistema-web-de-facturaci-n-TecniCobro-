@@ -1,0 +1,384 @@
+/* ========================================
+   ESTILOS PARA AFFILIATES SECTION
+   (Usando estilos base de Roles)
+   ======================================== */
+
+/* Importar variables globales si no están definidas */
+:root {
+  --primary-color: #1e40af;
+  --primary-light: #3b82f6;
+  --primary-dark: #1e3a8a;
+  --accent-color: #0ea5e9;
+  --success-color: #22c55e;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --text-primary: #1a202c;
+  --text-secondary: #000000;
+  --text-light: #9ca3af;
+  --bg-white: #ffffff;
+  --bg-gray-50: #f8fafc;
+  --bg-gray-100: #f1f5f9;
+  --border-color: #e5e7eb;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+}
+
+/* ========================================
+   CONTENEDOR PRINCIPAL
+   ======================================== */
+.affiliates-section {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  background-color: var(--bg-gray-50);
+  min-height: 100vh;
+}
+
+/* ========================================
+   HEADER - ESTILO ROLES/NOTIFICACIONES
+   ======================================== */
+.affiliates-section .section-header {
+  background: var(--bg-white);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.affiliates-section .section-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.affiliates-section .section-title svg {
+  color: var(--primary-light);
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.affiliates-section .section-title h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* ========================================
+   SECCIÓN DE FILTROS - ESTILO ROLES
+   ======================================== */
+.affiliates-section .filters-section {
+  background: var(--bg-white);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.affiliates-section .filter-select {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background-color: var(--bg-white);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.affiliates-section .filter-select:focus {
+  outline: none;
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.affiliates-section .filter-select:hover {
+  border-color: var(--primary-light);
+}
+
+/* ========================================
+   ESTADÍSTICAS - ESTILO ROLES
+   ======================================== */
+
+/* ========================================
+   GRID DE AFILIADOS - ESTILO ROLES
+   ======================================== */
+
+
+/* ========================================
+   MODAL - ESTILO ROLES
+   ======================================== */
+.affiliates-section .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.affiliates-section .modal {
+  background: var(--bg-white);
+  border-radius: 12px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+}
+
+.affiliates-section .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  background: var(--bg-white);
+  z-index: 10;
+}
+
+.affiliates-section .modal-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.affiliates-section .modal-close {
+  padding: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.affiliates-section .modal-close:hover {
+  background-color: var(--bg-gray-100);
+  color: var(--text-primary);
+}
+
+.affiliates-section .modal-body {
+  padding: 1.5rem;
+}
+
+/* ========================================
+   FORMULARIOS - ESTILO ROLES
+   ======================================== */
+.affiliates-section .user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.affiliates-section .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.affiliates-section .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.affiliates-section .form-group-full {
+  grid-column: span 2;
+}
+
+.affiliates-section .form-group label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.affiliates-section .form-group input,
+.affiliates-section .form-group select,
+.affiliates-section .form-group textarea {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  background: var(--bg-white);
+  color: var(--text-primary);
+}
+
+.affiliates-section .form-group input:focus,
+.affiliates-section .form-group select:focus,
+.affiliates-section .form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.affiliates-section .form-group small {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin-top: -0.25rem;
+}
+
+.affiliates-section .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+/* ========================================
+   DETALLES DE USUARIO - ESTILO ROLES
+   ======================================== */
+.affiliates-section .user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.affiliates-section .detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.affiliates-section .detail-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.affiliates-section .detail-group p {
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* ========================================
+   ESTADO VACÍO - ESTILO ROLES
+   ======================================== */
+.affiliates-section .empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-secondary);
+}
+
+.affiliates-section .empty-state svg {
+  margin-bottom: 1rem;
+  color: var(--text-light);
+  opacity: 0.5;
+}
+
+.affiliates-section .empty-state h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.affiliates-section .empty-state p {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ========================================
+   PLACEHOLDER DE SECCIÓN - ESTILO ROLES
+   ======================================== */
+.affiliates-section .section-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  background: var(--bg-white);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.affiliates-section .section-placeholder svg {
+  margin-bottom: 1rem;
+}
+
+.affiliates-section .section-placeholder h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.affiliates-section .section-placeholder p {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  margin: 0 0 1.5rem 0;
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+@media (max-width: 768px) {
+  .affiliates-section {
+    padding: 1rem;
+  }
+
+  .affiliates-section .section-header {
+    padding: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .affiliates-section .section-title h2 {
+    font-size: 1.25rem;
+  }
+
+  .affiliates-section .filters-section {
+    padding: 1rem;
+    flex-direction: column;
+  }
+
+  .affiliates-section .search-container {
+    min-width: 100%;
+  }
+
+  .affiliates-section .users-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .affiliates-section .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .affiliates-section .form-group-full {
+    grid-column: span 1;
+  }
+
+  .affiliates-section .user-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
