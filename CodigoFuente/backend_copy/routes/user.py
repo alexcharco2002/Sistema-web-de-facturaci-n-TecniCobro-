@@ -4,6 +4,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import List, Optional
 from datetime import datetime
+from schemas.notification import NotificacionCreate
+from utils.notifications import registrar_notificacion
+from sqlalchemy.exc import IntegrityError
+from psycopg2.errors import ForeignKeyViolation
+
 import base64
 
 from db.session import SessionLocal
@@ -13,7 +18,8 @@ from schemas.user import (
     UserUpdate, 
     UserResponse, 
     UserListResponse,
-    ChangePasswordRequest
+    ChangePasswordRequest,
+    ChangePasswordFirstLoginRequest
 )
 from security.jwt import verify_token
 from security.password import hash_password, verify_password
@@ -46,63 +52,60 @@ def get_current_user(payload: dict, db: Session) -> UsuarioSistema:
     return user
 
 # ============================================================================
-# HELPER: Verificar permisos
+# HELPER: Verificar permisos de usuario
 # ============================================================================
 def check_permission(user: UsuarioSistema, db: Session, module: str, action: str = None) -> bool:
     """
-    Verifica si el usuario tiene permiso para una acción
-    
+    Verifica si el usuario tiene permiso para una acción.
+
     Args:
         user: Usuario actual
         db: Sesión de base de datos
         module: Nombre del módulo (ej: 'usuarios', 'facturas')
-        action: Tipo de acción (ej: 'leer', 'crear', 'crud')
-    
+        action: Tipo de acción (ej: 'leer', 'crear', 'actualizar', 'eliminar', 'crud')
+
     Returns:
         True si tiene permiso, False si no
     """
     from models.role import RolAccion
-    
+
     # Normalizar módulo y acción
-    module = module.lower()
-    
-    # Buscar permisos del usuario
+    module = module.lower().strip()
+    action = action.lower().strip() if action else None
+
+    # Buscar permisos activos del rol del usuario
     permisos = db.query(RolAccion).filter(
         RolAccion.id_rol == user.id_rol,
         RolAccion.activo == True
     ).all()
-    
+
     for permiso in permisos:
+        # Validar campos
         if not permiso.nombre_accion:
             continue
-        
-        # Separar módulo y acción del permiso
-        parts = permiso.nombre_accion.lower().split('.')
-        if len(parts) != 2:
-            continue
-        
-        perm_module, perm_action = parts
-        
+
+        perm_module = permiso.nombre_accion.lower().strip()
+        perm_action = (permiso.tipo_accion or '').lower().strip()
+
         # Si el módulo no coincide, continuar
         if perm_module != module:
             continue
-        
-        # Si no se especifica acción, basta con tener algún permiso en el módulo
+
+        # Si no se especifica acción, tener cualquier permiso sobre el módulo ya es suficiente
         if action is None:
             return True
-        
-        # Normalizar acción solicitada
-        action_lower = action.lower()
-        
-        # Si tiene CRUD, tiene todas las acciones
-        if perm_action == 'crud':
+
+        # Si el permiso tiene CRUD, da acceso total al módulo
+        if perm_action == 'crud' or perm_action == 'operaciones crud':
             return True
-        
-        # Verificar coincidencia exacta
-        if perm_action == action_lower:
+
+        # Si la acción coincide exactamente
+        if perm_action == action:
             return True
-    
+
+    # Si no se encontró coincidencia
     return False
+
 
 def require_permission(user: UsuarioSistema, db: Session, module: str, action: str = None):
     """
@@ -188,9 +191,9 @@ def get_users(
     """
     # Obtener usuario actual y verificar permisos
     current_user = get_current_user(payload, db)
-    require_permission(current_user, db, "usuarios", "leer")
+    require_permission(current_user, db, "usuarios", "lectura")
     
-    query = db.query(UsuarioSistema)
+    query = db.query(UsuarioSistema) 
     
     # Filtro de búsqueda
     if search:
@@ -200,7 +203,7 @@ def get_users(
             UsuarioSistema.email.ilike(f"%{search}%"),
             UsuarioSistema.usuario.ilike(f"%{search}%")
         )
-        query = query.filter(search_filter)
+        query = query.filter(search_filter)  # consultas 
     
     # Filtro de rol
     if rol and rol != "all":
@@ -233,7 +236,7 @@ def get_user(
     current_user = get_current_user(payload, db)
     
     # Admin puede ver cualquier usuario
-    can_view_all = check_permission(current_user, db, "usuarios", "leer")
+    can_view_all = check_permission(current_user, db, "usuarios", "lectura")
     
     # Usuario normal solo puede verse a sí mismo
     if not can_view_all and current_user.id_usuario_sistema != user_id:
@@ -361,7 +364,8 @@ def create_user(
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-
+        
+        # ✅ Registrar auditoría
         registrar_auditoria(
             db=db,
             accion="CREATE",
@@ -369,6 +373,14 @@ def create_user(
             id_usuario=current_user.id_usuario_sistema
         )
         
+        # ✅ Crear notificación al crear un usuario
+        registrar_notificacion(
+            db=db,
+            id_usuario=current_user.id_usuario_sistema,
+            titulo="Usuario creado",
+            mensaje=f"El usuario '{new_user.usuario}' fue creado correctamente.",
+            tipo="success"
+        )
         print(f"✅ Usuario creado exitosamente: {username}")
 
         # ✅ Devolver respuesta con datos generados
@@ -376,7 +388,7 @@ def create_user(
         response_data["contraseña_generada"] = raw_password
 
         return response_data
-
+    
     except Exception as e:
         db.rollback()
         print(f"❌ Error al crear usuario: {e}")
@@ -384,7 +396,7 @@ def create_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error al crear el usuario: {str(e)}"
         )
-
+      
 # ========================================
 # ACTUALIZAR USUARIO
 # ========================================
@@ -477,12 +489,20 @@ def update_user(
     try:
         db.commit()
         db.refresh(user)
-        
+        # ✅ Registrar auditoría
         registrar_auditoria(
             db=db,
             accion="UPDATE",
             descripcion=f"Usuario '{user.usuario}' actualizado por '{payload['sub']}'",
             id_usuario=current_user.id_usuario_sistema
+        )
+        # ✅ Crear notificación 
+        registrar_notificacion(
+            db=db,
+            id_usuario=current_user.id_usuario_sistema,
+            titulo="Usuario modificado",
+            mensaje=f"El usuario '{user.usuario}' fue modificado correctamente.",
+            tipo="info"
         )
         return user_to_response(user, db)
     
@@ -495,7 +515,7 @@ def update_user(
         )
 
 # ========================================
-# ELIMINAR USUARIO
+# ELIMINAR / DESACTIVAR USUARIO
 # ========================================
 @router.delete("/{user_id}", status_code=status.HTTP_200_OK)
 def delete_user(
@@ -504,51 +524,101 @@ def delete_user(
     db: Session = Depends(get_db)
 ):
     """
-    Elimina un usuario
+    Elimina el usuario si no tiene relaciones.
+    Si tiene relaciones, lo desactiva (borrado lógico).
     Requiere permiso: usuarios.eliminar o usuarios.crud
     """
     current_user = get_current_user(payload, db)
     require_permission(current_user, db, "usuarios", "eliminar")
-    
-    # Verificar que no se esté eliminando a sí mismo
-    if current_user.id_usuario_sistema == user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No puedes eliminar tu propio usuario"
-        )
-    
-    # Obtener usuario a eliminar
+
+    # Buscar usuario
     user = db.query(UsuarioSistema).filter(
         UsuarioSistema.id_usuario_sistema == user_id
     ).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuario no encontrado"
         )
-    
+
     try:
+        # ✅ Intentar eliminar físicamente
         db.delete(user)
         db.commit()
-        
+
+        # Auditoría
         registrar_auditoria(
             db=db,
             accion="DELETE",
             descripcion=f"Usuario '{user.usuario}' eliminado por '{payload['sub']}'",
             id_usuario=current_user.id_usuario_sistema
         )
+
+        # Notificación
+        registrar_notificacion(
+            db=db,
+            id_usuario=current_user.id_usuario_sistema,
+            titulo="Usuario eliminado",
+            mensaje=f"El usuario '{user.usuario}' fue eliminado correctamente.",
+            tipo="info"
+        )
+
         return {
             "success": True,
-            "message": "Usuario eliminado exitosamente"
+            "message": f"Usuario '{user.usuario}' eliminado correctamente.",
+            "accion": "eliminado"
         }
-    
-    except Exception as e:
+
+    except IntegrityError as e:
         db.rollback()
-        print(f"Error al eliminar usuario: {e}")
+
+        # ✅ Si es por relación, desactivar el usuario
+        if isinstance(e.orig, ForeignKeyViolation):
+            print("⚠️ No se puede eliminar por relaciones, se desactiva el usuario")
+
+            # Si ya está inactivo, no hacer nada
+            if not user.activo:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"El usuario '{user.usuario}' ya está inactivo."
+                )
+
+            # Desactivar usuario
+            user.activo = False
+            db.commit()
+            db.refresh(user)
+
+            # Auditoría
+            registrar_auditoria(
+                db=db,
+                accion="UPDATE",
+                descripcion=f"Usuario '{user.usuario}' fue desactivado (por relaciones) por '{payload['sub']}'",
+                id_usuario=current_user.id_usuario_sistema
+            )
+
+            # Notificación
+            registrar_notificacion(
+                db=db,
+                id_usuario=current_user.id_usuario_sistema,
+                titulo="Usuario desactivado",
+                mensaje=f"El usuario '{user.usuario}' no se pudo eliminar porque está relacionado con otros módulos. Fue desactivado automáticamente.",
+                tipo="alerta"
+            )
+
+            return {
+                "success": True,
+                "message": f"⚠️ El usuario '{user.usuario}' no se pudo eliminar porque tiene relación con otros módulos, por lo que fue desactivado automáticamente.",
+                "accion": "desactivado",
+                "usuario": user_to_response(user, db)
+            }
+            
+
+        # Otros errores no esperados
+        print(f"Error inesperado al eliminar usuario: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al eliminar el usuario"
+            detail="Error al intentar eliminar el usuario"
         )
 
 # ========================================
@@ -579,11 +649,18 @@ def toggle_user_status(
     
     # Cambiar estado
     user.activo = not user.activo
-    
+    estado_texto = "activado" if user.activo else "desactivado"
     try:
         db.commit()
         db.refresh(user)
         
+        # ✅ Registrar auditoría
+        registrar_auditoria(
+            db=db,
+            accion="UPDATE",
+            descripcion=f"Usuario '{user.usuario}' fue {estado_texto} por '{payload['sub']}'",
+            id_usuario=current_user.id_usuario_sistema
+        )
         return user_to_response(user, db)
     
     except Exception as e:
@@ -650,7 +727,20 @@ def change_user_password(
     
     try:
         db.commit()
-        
+        #✅ Registrar auditoría
+        if current_user.id_usuario_sistema == user.id_usuario_sistema:
+            descripcion = f"El usuario '{user.usuario}' cambió su propia contraseña."
+        else:
+            descripcion = f"La contraseña del usuario '{user.usuario}' fue cambiada por el '{payload['sub']}'."
+
+        registrar_auditoria(
+            db=db,
+            accion="UPDATE",
+            descripcion=descripcion,
+            id_usuario=current_user.id_usuario_sistema
+        )
+
+
         return {
             "success": True,
             "message": "Contraseña actualizada exitosamente"
@@ -663,6 +753,60 @@ def change_user_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al actualizar la contraseña"
         )
+
+# ========================================
+# CAMBIAR CONTRASEÑA (PRIMER LOGIN)
+# ========================================
+@router.put("/{user_id}/change-password-first-login")
+def change_password_first_login(
+    user_id: int,
+    password_data: ChangePasswordFirstLoginRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Permite al usuario cambiar su contraseña en su primer inicio de sesión
+    o después de recuperación, sin verificar la contraseña actual.
+    """
+    user = db.query(UsuarioSistema).filter(
+        UsuarioSistema.id_usuario_sistema == user_id
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado"
+        )
+
+    # Validar nueva contraseña
+    if len(password_data.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La nueva contraseña debe tener al menos 8 caracteres"
+        )
+
+    # Actualizar contraseña directamente
+    user.clave = hash_password(password_data.new_password)
+
+    try:
+        db.commit()
+        # ==========================================
+        # ✅ Registrar auditoría
+        # ==========================================
+        registrar_auditoria(
+            db=db,
+            accion="UPDATE",
+            descripcion=f"El usuario '{user.usuario}' cambió su contraseña en su primer inicio de sesión.",
+            id_usuario=user.id_usuario_sistema
+        )
+        return {"success": True, "message": "Contraseña actualizada exitosamente"}
+    except Exception as e:
+        db.rollback()
+        print(f"Error al cambiar contraseña (primer login): {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al actualizar la contraseña"
+        )
+
 
 # ========================================
 # SUBIR FOTO DE PERFIL
@@ -799,7 +943,6 @@ def unlock_user_account(
             detail="Error al desbloquear el usuario"
         )
 
-# ... (Mantener las demás rutas: get_user_lock_status, get_blocked_users)
 # ========================================
 # OBTENER ESTADO DE BLOQUEO
 # ========================================

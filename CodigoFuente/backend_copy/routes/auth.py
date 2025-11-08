@@ -181,43 +181,37 @@ def resetear_intentos_fallidos(db: Session, user: UsuarioSistema):
         user.ultimo_acceso = datetime.now()
     db.commit()
 
+
 # ========================================
 # LOGIN - CON SISTEMA DE ROLES Y PERMISOS
 # ========================================
 @router.post("/login", response_model=dict)
 def login(user: UserLogin, db: Session = Depends(get_db)):
     """
-    Inicia sesión con usuario y contraseña
-    Incluye control de intentos fallidos, bloqueos y sistema de roles/permisos
+    Inicia sesión con usuario y contraseña.
+    Incluye control de intentos fallidos, bloqueos y sistema de roles/permisos.
     """
     try:
-        # Buscar usuario por nombre de usuario
         db_user = db.query(UsuarioSistema).filter(
             UsuarioSistema.usuario == user.username.strip().lower()
         ).first()
 
         if not db_user:
-            return {
-                "success": False,
-                "message": "El usuario ingresado no existe. Verifique el nombre de usuario."
-            }
+            return {"success": False, "message": "El usuario ingresado no existe."}
 
         if hasattr(db_user, 'activo') and not db_user.activo:
-            return {
-                "success": False,
-                "message": "Usuario inactivo. Contacte al administrador"
-            }
-        
-        # Verificar activo de bloqueo
-        activo_bloqueo = verificar_activo_bloqueo(db_user)
-        if activo_bloqueo["bloqueado"]:
+            return {"success": False, "message": "Usuario inactivo. Contacte al administrador."}
+
+        estado_bloqueo = verificar_activo_bloqueo(db_user)
+        if estado_bloqueo["bloqueado"]:
             return {
                 "success": False,
                 "bloqueado": True,
-                "tipo_bloqueo": activo_bloqueo["tipo"],
-                "message": activo_bloqueo["mensaje"],
-                "bloqueado_hasta": activo_bloqueo.get("bloqueado_hasta")
+                "tipo_bloqueo": estado_bloqueo["tipo"],
+                "message": estado_bloqueo["mensaje"],
+                "bloqueado_hasta": estado_bloqueo.get("bloqueado_hasta")
             }
+
         
         # Verificar contraseña
         if not verify_password(user.password.strip(), db_user.clave):
@@ -225,31 +219,33 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
             return {
                 "success": False,
                 "bloqueado": resultado.get("bloqueado", False),
-                "tipo_bloqueo": resultado.get("tipo"),
-                "message": resultado["mensaje"],
-                "intentos_fallidos": resultado["intentos"],
-                "intentos_restantes_temporal": resultado.get("intentos_restantes_temporal"),
-                "intentos_restantes_permanente": resultado.get("intentos_restantes_permanente"),
-                "bloqueado_hasta": resultado.get("bloqueado_hasta")
+                "message": resultado["mensaje"]
             }
-        
-        # Login exitoso - resetear intentos fallidos
+
+        # ⚙️ Detectar si es primer login
+        primer_login = getattr(db_user, "primer_login", False) or db_user.ultimo_acceso is None
+
+        # Actualizar último acceso y marcar primer login como completado
+        db_user.ultimo_acceso = datetime.now()
+        if hasattr(db_user, "primer_login"):
+            db_user.primer_login = False
+        db.commit()
+        db.refresh(db_user)
+
+        # Resetear intentos fallidos
         resetear_intentos_fallidos(db, db_user)
 
-        # Obtener rol y permisos del usuario
+        # Obtener rol y permisos
         rol_permisos = get_user_role_and_permissions(db, db_user)
-
-        # Procesar foto
         foto_url = process_user_photo(db_user.foto) if hasattr(db_user, 'foto') and db_user.foto else None
 
-        # Crear token con información del rol
+        # Crear token
         token_data = {
             "sub": db_user.usuario,
             "id_rol": db_user.id_rol,
             "nombre_rol": rol_permisos["rol"]["nombre_rol"] if rol_permisos["rol"] else None,
             "nombres": db_user.nombres
         }
-
         access_token = create_access_token(data=token_data)
 
         return {
@@ -269,22 +265,22 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
                     "fecha_nac": db_user.fecha_nac.isoformat() if db_user.fecha_nac else None,
                     "nombre_completo": f"{db_user.nombres} {db_user.apellidos}",
                     "id_rol": db_user.id_rol,
-                    "rol": rol_permisos["rol"],  # Objeto completo del rol
-                    "permisos": rol_permisos["permisos"],  # Lista de permisos
+                    "rol": rol_permisos["rol"],
+                    "permisos": rol_permisos["permisos"],
                     "email": db_user.email,
-                    "foto": foto_url
+                    "foto": foto_url,
+                    "ultimo_acceso": db_user.ultimo_acceso.isoformat(),
+                    "primer_login": primer_login
                 }
             }
         }
-    
+
     except Exception as e:
         print(f"❌ Error en login: {e}")
         import traceback
         traceback.print_exc()
-        return {
-            "success": False,
-            "message": "Error interno del servidor"
-        }
+        return {"success": False, "message": "Error interno del servidor"}
+
 
 # ========================================
 # VERIFICAR SESIÓN
@@ -314,11 +310,24 @@ def verify_session(payload: dict = Depends(verify_token), db: Session = Depends(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=activo_bloqueo["mensaje"]
         )
-    
+
+    # ====================================================
+    # ⚙️ Detectar si es el primer login y actualizar fecha
+    # ====================================================
+    primer_login = getattr(db_user, "primer_login", False)
+
+    # Solo actualiza ultimo_acceso, no cambies primer_login aquí
+    primer_login = db_user.ultimo_acceso is None
+    if primer_login:
+        db_user.ultimo_acceso = datetime.now()
+        db.commit()
+
+
+
     # Obtener rol y permisos actualizados
     rol_permisos = get_user_role_and_permissions(db, db_user)
     foto_url = process_user_photo(db_user.foto) if hasattr(db_user, 'foto') and db_user.foto else None
-    
+
     return {
         "id_usuario_sistema": db_user.id_usuario_sistema,
         "usuario": db_user.usuario,
@@ -335,7 +344,9 @@ def verify_session(payload: dict = Depends(verify_token), db: Session = Depends(
         "rol": rol_permisos["rol"],
         "permisos": rol_permisos["permisos"],
         "fecha_registro": db_user.fecha_registro.isoformat() if db_user.fecha_registro else None,
-        "foto": foto_url
+        "foto": foto_url,
+        "ultimo_acceso": db_user.ultimo_acceso.isoformat() if db_user.ultimo_acceso else None,
+        "primer_login": primer_login
     }
 
 # ========================================

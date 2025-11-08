@@ -33,6 +33,7 @@ class UsuarioSistema(Base):
     intentos_fallidos = Column(Integer, default=0)
     bloqueado_hasta = Column(DateTime, nullable=True)
     bloqueado_permanente = Column(Boolean, default=False)
+ 
     
     # Relación con el rol
     rol = relationship("Rol", backref="usuarios", lazy="joined")

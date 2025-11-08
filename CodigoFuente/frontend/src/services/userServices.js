@@ -12,7 +12,8 @@ const API_CONFIG = {
     roles: '/roles',
     toggleStatus: (id) => `/users/${id}/toggle-status`,
     changePassword: (id) => `/users/${id}/change-password`,
-    uploadPhoto: (id) => `/users/${id}/upload-photo`
+    uploadPhoto: (id) => `/users/${id}/upload-photo`,
+    changePasswordFirstLogin: (userId) => `/users/${userId}/change-password-first-login`
   }
 };
 
@@ -283,11 +284,45 @@ class UsersService {
         method: 'DELETE'
       });
 
+      // Analiza la respuesta del backend
+    if (data?.accion === 'eliminado') {
       return {
         success: true,
-        data: data,
-        message: 'Usuario eliminado exitosamente'
+        message: `✅ El usuario "${data.usuario?.usuario || ''}" fue eliminado correctamente.`,
+        data
       };
+    }
+
+    if (data?.accion === 'desactivado') {
+      return {
+        success: true,
+        message: `⚠️ El usuario "${data.usuario?.usuario || ''}" no se pudo eliminar porque está relacionado con otros módulos, solo fue desactivado.`,
+        data
+      };
+    }
+
+    // Si viene con success pero sin "accion", usa mensaje genérico
+    if (data?.success) {
+      return {
+        success: true,
+        message: data.message || 'Operación completada correctamente.',
+        data
+      };
+    }
+
+    // Si viene con error desde el backend
+    if (data?.detail) {
+      return {
+        success: false,
+        message: data.detail
+      };
+    }
+
+    // Caso por defecto
+    return {
+      success: false,
+      message: 'No se pudo completar la operación.'
+    };
 
     } catch (error) {
       console.error('❌ Error eliminando usuario:', error);
@@ -327,7 +362,7 @@ class UsersService {
    */
   async changeUserPassword(userId, passwords) {
     try {
-      if (!passwords.currentPassword && authService.getCurrentUser()?.rol !== 'admin') {
+      if (!passwords.currentPassword && authService.getCurrentUser()?.rol !== 'Administrador') {
         throw new Error('Contraseña actual es requerida');
       }
 
@@ -362,6 +397,42 @@ class UsersService {
       };
     }
   }
+  /**
+ * Cambiar contraseña en primer inicio 
+ */
+  async changePasswordFirstLogin(userId, newPassword ) {
+    try {
+      if (!newPassword) {
+        throw new Error('Nueva contraseña es requerida');
+      }
+
+      if (newPassword.length < 8) {
+        throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
+      }
+
+      const data = await this.makeRequest(API_CONFIG.endpoints.changePasswordFirstLogin(userId), {
+        method: 'PUT',
+       
+        body: { 
+          new_password: newPassword 
+        }
+      });
+
+      return {
+        success: true,
+        data: data,
+        message: 'Contraseña actualizada exitosamente (primer login)'
+      };
+
+    } catch (error) {
+      console.error('❌ Error cambiando contraseña (primer login):', error);
+      return {
+        success: false,
+        message: error.message || 'Error al cambiar contraseña en primer login'
+      };
+    }
+  }
+
 
   /**
    * ✅ Subir foto de perfil - CORREGIDO

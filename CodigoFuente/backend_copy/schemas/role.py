@@ -31,22 +31,39 @@ class RolAccionBase(BaseModel):
     nombre_accion: str
     tipo_accion: str
     activo: bool = True
-    
+
     @validator('tipo_accion')
     def validate_tipo_accion(cls, v):
-        tipos_validos = ['crear', 'leer', 'actualizar', 'eliminar', 'ejecutar']
+        tipos_validos = [
+            'operaciones crud',
+            'lectura',
+            'crear',
+            'eliminar',
+            'actualizar',
+            'reportes',
+            'configuración'
+        ]
         if v.lower() not in tipos_validos:
             raise ValueError(f'El tipo de acción debe ser uno de: {", ".join(tipos_validos)}')
         return v.lower()
+
 
 class RolAccionCreate(BaseModel):
     nombre_accion: str
     tipo_accion: str
     activo: bool = True
-    
+
     @validator('tipo_accion')
     def validate_tipo_accion(cls, v):
-        tipos_validos = ['crear', 'leer', 'actualizar', 'eliminar', 'ejecutar']
+        tipos_validos = [
+            'operaciones crud',
+            'lectura',
+            'crear',
+            'eliminar',
+            'actualizar',
+            'reportes',
+            'configuración'
+        ]
         if v.lower() not in tipos_validos:
             raise ValueError(f'El tipo de acción debe ser uno de: {", ".join(tipos_validos)}')
         return v.lower()

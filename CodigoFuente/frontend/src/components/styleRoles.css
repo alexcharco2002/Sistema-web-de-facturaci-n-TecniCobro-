@@ -17,7 +17,7 @@
   --bg-white: #ffffff;
   --bg-gray-50: #f8fafc;
   --bg-gray-100: #f1f5f9;
-  --border-color: #1c3658;
+  --border-color: #e5e7eb;
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
@@ -27,7 +27,6 @@
 /* ========================================
    CONTENEDOR PRINCIPAL
    ======================================== */
-
 .roles-section {
   padding: 1.5rem;
   max-width: 1400px;
@@ -37,9 +36,62 @@
 }
 
 /* ========================================
+   HEADER - ESTILO NOTIFICACIONES
+   ======================================== */
+.roles-section .section-header {
+  background: var(--bg-white);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-md);
+}
+
+.roles-section .section-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.roles-section .header-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.roles-section .header-title svg {
+  color: var(--primary-light);
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.roles-section .header-title h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+}
+
+.roles-section .subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.roles-section .filters-section {
+  background: var(--notif-bg-white);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--notif-shadow-md);
+  display: flex;
+  gap: 1rem;
+}
+
+/* ========================================
    LAYOUT DE DOS COLUMNAS
    ======================================== */
-
 .roles-layout {
   display: grid;
   grid-template-columns: 350px 1fr;
@@ -54,9 +106,8 @@
 }
 
 /* ========================================
-   PANEL DE ROLES (COLUMNA IZQUIERDA)
+   PANEL DE ROLES (COLUMNA IZQUIERDA) - ESTILO NOTIFICACIONES
    ======================================== */
-
 .roles-list-panel {
   background: var(--bg-white);
   border-radius: 12px;
@@ -65,7 +116,6 @@
   height: fit-content;
   max-height: calc(100vh - 250px);
   overflow-y: auto;
-  border: 2px solid var(--border-color);
 }
 
 .roles-list-panel .panel-title {
@@ -77,7 +127,7 @@
   color: var(--text-primary);
   margin: 0 0 1rem 0;
   padding-bottom: 0.75rem;
-  border-bottom: 2px solid var(--bg-gray-100);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .roles-list-panel .panel-title svg {
@@ -86,9 +136,9 @@
   color: var(--primary-light);
 }
 
-/* Scroll personalizado */
+/* Scroll personalizado suave */
 .roles-list-panel::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .roles-list-panel::-webkit-scrollbar-track {
@@ -97,7 +147,7 @@
 }
 
 .roles-list-panel::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: #cbd5e1;
   border-radius: 10px;
 }
 
@@ -112,12 +162,11 @@
 }
 
 /* ========================================
-   ITEMS DE ROLES
+   ITEMS DE ROLES - ESTILO NOTIFICACIONES
    ======================================== */
-
 .role-item {
   padding: 1rem;
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -127,20 +176,20 @@
 .role-item:hover {
   border-color: var(--primary-light);
   background: #f0f9ff;
-  transform: translateX(4px);
+  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
 .role-item.selected {
   border-color: var(--primary-light);
-  background: #dbeafe;
+  background: linear-gradient(to right, #eff6ff 0%, var(--bg-white) 10%);
   box-shadow: var(--shadow-md);
+  border-left: 4px solid var(--primary-light);
 }
 
 .role-item.inactive {
   opacity: 0.6;
   background: var(--bg-gray-50);
-  border-style: dashed;
 }
 
 .role-item.inactive:hover {
@@ -192,6 +241,7 @@
   gap: 0.25rem;
   font-size: 0.75rem;
   color: var(--text-light);
+  font-weight: 500;
 }
 
 .date-badge svg {
@@ -200,15 +250,13 @@
 }
 
 /* ========================================
-   PANEL DE ACCIONES (COLUMNA DERECHA)
+   PANEL DE ACCIONES (COLUMNA DERECHA) - ESTILO NOTIFICACIONES
    ======================================== */
-
 .actions-panel {
   background: var(--bg-white);
   border-radius: 12px;
   box-shadow: var(--shadow-md);
   padding: 1.5rem;
-  border: 2px solid var(--border-color);
   min-height: 400px;
 }
 
@@ -217,7 +265,7 @@
   align-items: center;
   justify-content: space-between;
   padding-bottom: 1rem;
-  border-bottom: 2px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
   margin-bottom: 1.5rem;
   gap: 1rem;
 }
@@ -236,9 +284,8 @@
 }
 
 /* ========================================
-   GRID DE ACCIONES
+   GRID DE ACCIONES - ESTILO NOTIFICACIONES
    ======================================== */
-
 .actions-grid {
   display: grid;
   gap: 1rem;
@@ -252,7 +299,7 @@
 }
 
 .action-card {
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 1rem;
   transition: all 0.3s ease;
@@ -268,7 +315,6 @@
 .action-card.inactive {
   opacity: 0.6;
   background: var(--bg-gray-50);
-  border-style: dashed;
 }
 
 .action-card-header {
@@ -297,10 +343,10 @@
   padding: 0.25rem 0.75rem;
   background: var(--bg-gray-100);
   color: var(--text-secondary);
-  border-radius: 6px;
+  border-radius: 12px;
   font-size: 0.75rem;
-  font-weight: 500;
-  border: 1px solid var(--border-color);
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .action-buttons {
@@ -321,13 +367,14 @@
 }
 
 /* ========================================
-   BOTONES DE ACCIÓN (ICONOS)
+   BOTONES DE ACCIÓN (ICONOS) - ESTILO NOTIFICACIONES
    ======================================== */
-
 .action-btn {
-  padding: 0.5rem;
-  border: none;
-  background: transparent;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  background: var(--bg-white);
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.2s ease;
@@ -339,6 +386,7 @@
 
 .action-btn:hover {
   background: var(--bg-gray-100);
+  border-color: var(--primary-light);
 }
 
 .action-btn.edit:hover {
@@ -348,6 +396,7 @@
 
 .action-btn.delete:hover {
   background: #fee2e2;
+  border-color: #fecaca;
   color: var(--error-color);
 }
 
@@ -367,27 +416,27 @@
 }
 
 /* ========================================
-   BADGES DE ESTADO
+   BADGES DE ESTADO - ESTILO NOTIFICACIONES
    ======================================== */
-
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
+  border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 600;
+  text-transform: uppercase;
 }
 
 .status-badge.active {
-  background: #dcfce7;
-  color: #16a34a;
+  background: #d1fae5;
+  color: #065f46;
 }
 
 .status-badge.inactive {
   background: #fee2e2;
-  color: #dc2626;
+  color: #991b1b;
 }
 
 .status-badge svg {
@@ -396,9 +445,8 @@
 }
 
 /* ========================================
-   ESTADO VACÍO / PLACEHOLDER
+   ESTADO VACÍO / PLACEHOLDER - ESTILO NOTIFICACIONES
    ======================================== */
-
 .empty-state {
   text-align: center;
   padding: 3rem 1.5rem;
@@ -425,9 +473,8 @@
 }
 
 /* ========================================
-   ALERTAS
+   ALERTAS - ESTILO NOTIFICACIONES
    ======================================== */
-
 .alert {
   padding: 1rem;
   border-radius: 8px;
@@ -436,7 +483,7 @@
   gap: 0.75rem;
   margin-bottom: 1rem;
   font-size: 0.9375rem;
-  border: 2px solid;
+  border: 1px solid;
 }
 
 .alert svg {
@@ -472,10 +519,27 @@
 /* ========================================
    RESPONSIVE
    ======================================== */
-
 @media (max-width: 768px) {
   .roles-section {
     padding: 1rem;
+  }
+
+  .roles-section .section-header {
+    padding: 1rem;
+  }
+
+  .roles-section .section-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .roles-section .header-title h1 {
+    font-size: 1.25rem;
+  }
+
+  .roles-section .btn-primary {
+    width: 100%;
+    justify-content: center;
   }
 
   .roles-list-panel {
@@ -503,7 +567,6 @@
 /* ========================================
    ANIMACIONES
    ======================================== */
-
 @keyframes spin {
   from {
     transform: rotate(0deg);
@@ -520,7 +583,6 @@
 /* ========================================
    UTILIDADES ADICIONALES
    ======================================== */
-
 .mt-4 {
   margin-top: 1rem;
 }

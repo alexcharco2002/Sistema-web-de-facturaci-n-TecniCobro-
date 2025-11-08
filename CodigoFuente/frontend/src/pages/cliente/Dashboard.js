@@ -1,22 +1,24 @@
 // src/pages/cliente/Dashboard.js
-// Panel de Cliente - Dashboard.js
+// Panel de Cliente - Dashboard con Módulos Dinámicos y Cambio de Contraseña Obligatorio
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../../services/authServices';
+import userService from '../../services/userServices';
+
+// Importar configuración de módulos para clientes
+import { buildModulesFromPermissions } from '../../utils/modulesDefinitions';
 
 // Importar componentes
 import NotificationDropdown from '../../components/NotificationDropdown';
 import UserProfile from '../../components/UserProfile';
+import ChangePasswordModal from '../../components/ChangePasswordModal';
 
 // Importar iconos
 import { 
   FileText, 
   Search,
   Droplets,
-  BarChart3,
-  Calendar,
-  TrendingUp,
   RefreshCw,
   User,
   Edit,
@@ -27,13 +29,16 @@ import {
   Phone,
   MapPin,
   Shield,
-  DollarSign,
   CreditCard,
   Activity,
   AlertCircle,
   CheckCircle,
   Clock,
-  TrendingDown
+  TrendingUp,
+  TrendingDown,
+  ChevronDown,
+  ChevronRight,
+  Calendar
 } from 'lucide-react';
 
 const ClienteDashboard = () => {
@@ -42,23 +47,72 @@ const ClienteDashboard = () => {
   const [notifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [userPermissions, setUserPermissions] = useState([]);
+  const [organizedModules, setOrganizedModules] = useState([]);
+  const [expandedCategories, setExpandedCategories] = useState({});
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({});
 
+  // Estados para el modal de cambio de contraseña
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+
+  // Estados para datos del cliente
+  const [clientStats, setClientStats] = useState({
+    currentInvoice: 0,
+    monthlyConsumption: 0,
+    pendingInvoices: 0,
+    lastPayment: 0
+  });
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // ============================================================================
+  // EFECTOS Y CARGA DE DATOS
+  // ============================================================================
+  
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
     
     if (!currentUser || !authService.isAuthenticated()) {
+      console.log('Usuario no autenticado, redirigiendo al login');
       navigate('/login');
       return;
     }
 
     setUser(currentUser);
     setProfileData(currentUser);
+    const permissions = authService.getUserPermissions();
+    setUserPermissions(permissions);
 
+    // 🔥 VERIFICAR SI ES PRIMER LOGIN Y MOSTRAR MODAL
+    if (currentUser.primer_login === true || currentUser.primer_login === 1) {
+      console.log('🟢 Es el primer login del cliente, mostrando modal de cambio de contraseña');
+      setShowChangePasswordModal(true);
+    }
+    
+    // Construir módulos organizados por categorías para clientes
+    const modules = buildModulesFromPermissions(permissions);
+    setOrganizedModules(modules);
+    
+    // Inicializar categorías expandidas
+    const initialExpanded = {};
+    modules.forEach(category => {
+      initialExpanded[category.id] = category.defaultOpen !== false;
+    });
+    setExpandedCategories(initialExpanded);
+    
+    console.log('✅ Cliente autenticado:', {
+      nombre: currentUser.nombres,
+      rol: currentUser.rol?.nombre_rol,
+      permisos: permissions.length,
+      categorias: modules.length,
+      primer_login: currentUser.primer_login
+    });
+
+    // Verificar sesión
     const verifySession = async () => {
       const result = await authService.verifySession();
       if (!result.success) {
+        console.log('Sesión inválida, redirigiendo al login');
         navigate('/login');
       }
     };
@@ -66,22 +120,52 @@ const ClienteDashboard = () => {
     verifySession();
   }, [navigate]);
 
+  useEffect(() => {
+    if (user) {
+      loadClientData();
+    }
+  }, [user]);
+
+  const loadClientData = async () => {
+    try {
+      setDataLoading(true);
+      
+      // Aquí cargarías los datos específicos del cliente
+      // Por ahora usamos valores de ejemplo
+      setClientStats({
+        currentInvoice: 0,
+        monthlyConsumption: 0,
+        pendingInvoices: 0,
+        lastPayment: 0
+      });
+
+    } catch (error) {
+      console.error('Error cargando datos del cliente:', error);
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
   const handleLogout = async () => {
     if (window.confirm('¿Estás seguro de que deseas cerrar sesión?')) {
       try {
         await authService.logout();
         navigate('/login');
       } catch (error) {
+        console.error('Error en logout:', error);
         navigate('/login');
       }
     }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    await loadClientData();
+    setLoading(false);
   };
 
   const handleMarkAsRead = (notificationId) => {
@@ -106,12 +190,35 @@ const ClienteDashboard = () => {
 
   const handleSaveProfile = async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUser(profileData);
-      setEditingProfile(false);
-      alert('Perfil actualizado correctamente');
+      if (!user?.id_usuario_sistema) {
+        throw new Error('No se encontró el ID del usuario');
+      }
+
+      const dataToUpdate = {
+        nombres: profileData.nombres,
+        apellidos: profileData.apellidos,
+        email: profileData.email,
+        telefono: profileData.telefono || null,
+        direccion: profileData.direccion || null,
+      };
+
+      const result = await userService.updateUser(user.id_usuario_sistema, dataToUpdate);
+      
+      if (result.success) {
+        setUser(prevUser => ({
+          ...prevUser,
+          ...result.data
+        }));
+        setProfileData(result.data);
+        setEditingProfile(false);
+        alert('Perfil actualizado correctamente');
+      } else {
+        alert(result.message || 'Error al actualizar el perfil');
+      }
+      
     } catch (error) {
-      alert('Error al actualizar el perfil');
+      console.error('❌ Error al actualizar perfil:', error);
+      alert(error.message || 'Error al actualizar el perfil');
     }
   };
 
@@ -127,66 +234,54 @@ const ClienteDashboard = () => {
     }));
   };
 
+  // 🔥 HANDLER PARA CERRAR EL MODAL DE CAMBIO DE CONTRASEÑA
+  const handleClosePasswordModal = () => {
+    // Solo permitir cerrar si NO es primer login
+    if (!user?.primer_login) {
+      setShowChangePasswordModal(false);
+    }
+  };
+
+  // 🔥 HANDLER PARA ÉXITO EN CAMBIO DE CONTRASEÑA
+  const handlePasswordChangeSuccess = async () => {
+    console.log('✅ Contraseña cambiada exitosamente');
+    
+    // Actualizar el estado del usuario para quitar primer_login
+    setUser(prevUser => ({
+      ...prevUser,
+      primer_login: false
+    }));
+
+    // Actualizar en el localStorage también
+    const currentUser = authService.getCurrentUser();
+    if (currentUser) {
+      currentUser.primer_login = false;
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    }
+
+    // Cerrar el modal
+    setShowChangePasswordModal(false);
+
+    // Recargar datos del cliente
+    await loadClientData();
+  };
+
+  const toggleCategory = (categoryId) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
+
   const getUserInitials = (nombres, apellidos) => {
     const firstInitial = nombres ? nombres.charAt(0).toUpperCase() : '';
     const lastInitial = apellidos ? apellidos.charAt(0).toUpperCase() : '';
     return firstInitial + lastInitial || 'C';
   };
 
-  if (!user) {
-    return (
-      <div className="dashboard-loading">
-        <div className="loading-spinner">
-          <RefreshCw className="w-8 h-8 animate-spin" />
-          <p>Cargando dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const sidebarItems = [
-    { id: 'overview', label: 'Panel General', icon: BarChart3 },
-    { id: 'profile', label: 'Mi Perfil', icon: User },
-    { id: 'invoices', label: 'Mis Facturas', icon: FileText },
-    { id: 'payments', label: 'Historial de Pagos', icon: DollarSign },
-    { id: 'consumption', label: 'Mi Consumo', icon: Activity },
-    { id: 'support', label: 'Soporte', icon: AlertCircle }
-  ];
-
-  const stats = [
-    { 
-      title: 'Factura Actual', 
-      value: '$0', 
-      change: '0%', 
-      color: 'blue',
-      icon: FileText,
-      trend: 'up'
-    },
-    { 
-      title: 'Consumo del Mes', 
-      value: '0 m³', 
-      change: '0%', 
-      color: 'green',
-      icon: Activity,
-      trend: 'down'
-    },
-    { 
-      title: 'Facturas Pendientes', 
-      value: '0', 
-      change: '0%', 
-      color: 'orange',
-      icon: Clock,
-      trend: 'down'
-    },
-    { 
-      title: 'Último Pago', 
-      value: '$0', 
-      change: '', 
-      color: 'emerald',
-      icon: CheckCircle,
-      trend: 'up'
-    }
-  ];
+  // ============================================================================
+  // COMPONENTES
+  // ============================================================================
 
   const StatCard = ({ stat }) => {
     const IconComponent = stat.icon;
@@ -215,9 +310,64 @@ const ClienteDashboard = () => {
     );
   };
 
+  // ============================================================================
+  // RENDER LOADING
+  // ============================================================================
+
+  if (!user) {
+    return (
+      <div className="dashboard-loading">
+        <div className="loading-spinner">
+          <RefreshCw className="w-8 h-8 animate-spin" />
+          <p>Cargando dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Tarjetas de estadísticas del cliente
+  const stats = [
+    { 
+      title: 'Factura Actual', 
+      value: dataLoading ? '...' : `$${clientStats.currentInvoice}`, 
+      change: '+0%', 
+      color: 'blue',
+      icon: FileText,
+      trend: 'up'
+    },
+    { 
+      title: 'Consumo del Mes', 
+      value: dataLoading ? '...' : `${clientStats.monthlyConsumption} m³`, 
+      change: '+0%', 
+      color: 'green',
+      icon: Activity,
+      trend: 'down'
+    },
+    { 
+      title: 'Facturas Pendientes', 
+      value: dataLoading ? '...' : clientStats.pendingInvoices.toString(), 
+      change: '+0%', 
+      color: 'orange',
+      icon: Clock,
+      trend: 'down'
+    },
+    { 
+      title: 'Último Pago', 
+      value: dataLoading ? '...' : `$${clientStats.lastPayment}`, 
+      change: '', 
+      color: 'emerald',
+      icon: CheckCircle,
+      trend: 'up'
+    }
+  ];
+
+  // ============================================================================
+  // RENDER PRINCIPAL
+  // ============================================================================
+
   return (
     <div className="dashboard">
-      {/* Sidebar */}
+      {/* Sidebar con Categorías Dinámicas */}
       <div className="sidebar">
         <div className="sidebar-header">
           <div className="logo-container">
@@ -232,20 +382,63 @@ const ClienteDashboard = () => {
         </div>
 
         <nav className="sidebar-nav">
-          {sidebarItems.map((item) => {
-            const IconComponent = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`nav-item ${activeSection === item.id ? 'active' : ''}`}
-              >
-                <IconComponent className="w-5 h-5" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+          {organizedModules.map((category) => (
+            <div key={category.id} className="nav-category">
+              {/* Header de categoría */}
+              {category.collapsible ? (
+                <button
+                  className="category-header"
+                  onClick={() => toggleCategory(category.id)}
+                >
+                  <div className="category-header-content">
+                    <category.icon className="w-4 h-4" />
+                    <span className="category-label">{category.label}</span>
+                  </div>
+                  {expandedCategories[category.id] ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+              ) : (
+                <div className="category-header-static">
+                  <category.icon className="w-4 h-4" />
+                  <span className="category-label">{category.label}</span>
+                </div>
+              )}
+
+              {/* Módulos de la categoría */}
+              {(!category.collapsible || expandedCategories[category.id]) && (
+                <div className="category-modules">
+                  {category.modules.map((module) => {
+                    const IconComponent = module.icon;
+                    return (
+                      <button
+                        key={module.id}
+                        onClick={() => setActiveSection(module.id)}
+                        className={`nav-item ${activeSection === module.id ? 'active' : ''}`}
+                        title={module.description || module.label}
+                      >
+                        <IconComponent className="w-5 h-5" />
+                        <span>{module.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
         </nav>
+
+        {/* Información de permisos del usuario */}
+        <div className="sidebar-footer">
+          <div className="user-permissions-info">
+            <Shield className="w-4 h-4 text-gray-400" />
+            <span className="text-xs text-gray-500">
+              {userPermissions.length} permisos activos
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -274,8 +467,9 @@ const ClienteDashboard = () => {
                 className={`refresh-btn ${loading ? 'loading' : ''}`}
                 onClick={handleRefresh}
                 title="Actualizar datos"
+                disabled={loading}
               >
-                <RefreshCw className="w-5 h-5" />
+                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
               </button>
 
               {/* Notifications */}
@@ -289,7 +483,7 @@ const ClienteDashboard = () => {
               <UserProfile
                 user={user}
                 onLogout={handleLogout}
-                onProfileClick={handleProfileClick}
+                onViewProfile={handleProfileClick}
                 onSettingsClick={handleSettingsClick}
               />
             </div>
@@ -334,16 +528,23 @@ const ClienteDashboard = () => {
                   </div>
                 </div>
 
-                {/* Información Importante */}
+                {/* Estado de Cuenta */}
                 <div className="card">
                   <div className="card-header">
                     <h3 className="card-title">Estado de Cuenta</h3>
                   </div>
                   <div className="activity-list">
-                    <div className="empty-state">
-                      <CheckCircle className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>No tienes facturas pendientes</p>
-                    </div>
+                    {dataLoading ? (
+                      <div className="loading-state">
+                        <RefreshCw className="w-6 h-6 animate-spin" />
+                        <p>Cargando datos...</p>
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <CheckCircle className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                        <p>No tienes facturas pendientes</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -495,8 +696,8 @@ const ClienteDashboard = () => {
                           Tipo de Cliente
                         </label>
                         <div className="form-value">
-                          <span className={`role-badge ${profileData.rol?.toLowerCase()}`}>
-                            {profileData.rol || 'Cliente'}
+                          <span className={`role-badge ${profileData.rol?.nombre_rol?.toLowerCase()}`}>
+                            {profileData.rol?.nombre_rol || 'Cliente'}
                           </span>
                         </div>
                       </div>
@@ -520,40 +721,28 @@ const ClienteDashboard = () => {
             </div>
           )}
 
-          {/* Otras secciones */}
-          {activeSection === 'invoices' && (
-            <div className="section-placeholder">
-              <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Mis Facturas</h2>
-              <p>Consulta y descarga tus facturas de consumo de agua.</p>
-            </div>
-          )}
-
-          {activeSection === 'payments' && (
-            <div className="section-placeholder">
-              <DollarSign className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Historial de Pagos</h2>
-              <p>Revisa el historial completo de tus pagos realizados.</p>
-            </div>
-          )}
-
-          {activeSection === 'consumption' && (
+          {/* Secciones genéricas para otros módulos */}
+          {!['overview', 'profile'].includes(activeSection) && (
             <div className="section-placeholder">
               <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Mi Consumo de Agua</h2>
-              <p>Visualiza estadísticas y gráficos de tu consumo mensual.</p>
-            </div>
-          )}
-
-          {activeSection === 'support' && (
-            <div className="section-placeholder">
-              <AlertCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Soporte y Ayuda</h2>
-              <p>¿Tienes alguna duda? Contáctanos para asistencia.</p>
+              <h2>Módulo en Desarrollo</h2>
+              <p>Esta sección estará disponible próximamente.</p>
             </div>
           )}
         </main>
       </div>
+
+      {/* 🔥 MODAL DE CAMBIO DE CONTRASEÑA */}
+      {user && (
+        <ChangePasswordModal
+          isOpen={showChangePasswordModal}
+          onClose={handleClosePasswordModal}
+          userId={user.id_usuario_sistema}
+          userEmail={user.email}
+          isPrimerLogin={user.primer_login === true || user.primer_login === 1}
+          onSuccess={handlePasswordChangeSuccess}
+        />
+      )}
     </div>
   );
 };

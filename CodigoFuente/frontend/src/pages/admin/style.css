@@ -267,8 +267,17 @@
 }
 
 /* ===== USER PROFILE STYLES ===== */
+.profile-section {
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  background-color: var(--bg-gray-50);
+  min-height: 100vh;
+}
+
 .user-profile-container {
   position: relative;
+
 }
 
 .user-profile {
@@ -1125,7 +1134,7 @@
   border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
-  text-transform: uppercase;
+
   letter-spacing: 0.5px;
 }
 
@@ -1180,7 +1189,7 @@
   animation: spin 1s linear infinite;
 }
 
-/* Avatar variants para diferentes roles */
+/* Avatar variants para diferentes profile */
 .user-profile[data-role="admin"] .user-avatar-fallback {
   background: linear-gradient(135deg, var(--warning-color) 0%, #f97316 100%);
 }
@@ -1469,7 +1478,7 @@
   cursor: not-allowed;
 }
 
-/* Estilos para distribución de roles */
+/* Estilos para distribución de profile */
 .role-distribution {
   padding: 1rem;
 }
@@ -1644,21 +1653,7 @@
   max-width: 500px;
 }
 
-.section-placeholder .btn-primary {
-  margin-top: 1.5rem;
-  padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-  border-radius: 0.5rem;
-  font-weight: 500;
-  transition: all 0.2s;
-  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
-}
 
-.section-placeholder .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px -2px rgba(59, 130, 246, 0.4);
-}
 
 /* ============================================================================
    QUICK ACTIONS - Mejoras visuales

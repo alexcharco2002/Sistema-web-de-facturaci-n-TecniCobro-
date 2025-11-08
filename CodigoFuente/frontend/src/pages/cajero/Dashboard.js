@@ -1,13 +1,18 @@
 // src/pages/cajero/Dashboard.js
-// Panel de Cajero - Dashboard.js
+// Panel de Cajero - Dashboard con Módulos Dinámicos y Cambio de Contraseña Obligatorio
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../../services/authServices';
+import userService from '../../services/userServices';
+
+// Importar configuración de módulos para cajeros
+import { buildModulesFromPermissions } from '../../utils/modulesDefinitions';
 
 // Importar componentes
 import NotificationDropdown from '../../components/NotificationDropdown';
 import UserProfile from '../../components/UserProfile';
+import ChangePasswordModal from '../../components/ChangePasswordModal';
 
 // Importar iconos
 import { 
@@ -17,6 +22,7 @@ import {
   BarChart3,
   Calendar,
   TrendingUp,
+  TrendingDown,
   RefreshCw,
   User,
   Edit,
@@ -32,7 +38,8 @@ import {
   CreditCard,
   Receipt,
   Clock,
-  Users
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 
 const CajeroDashboard = () => {
@@ -41,23 +48,72 @@ const CajeroDashboard = () => {
   const [notifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
+  const [userPermissions, setUserPermissions] = useState([]);
+  const [organizedModules, setOrganizedModules] = useState([]);
+  const [expandedCategories, setExpandedCategories] = useState({});
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({});
 
+  // Estados para el modal de cambio de contraseña
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+
+  // Estados para datos del cajero
+  const [cajeroStats, setCajeroStats] = useState({
+    collectionsToday: 0,
+    transactionsToday: 0,
+    pendingInvoices: 0,
+    invoicesMonth: 0
+  });
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // ============================================================================
+  // EFECTOS Y CARGA DE DATOS
+  // ============================================================================
+  
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
     
     if (!currentUser || !authService.isAuthenticated()) {
+      console.log('Usuario no autenticado, redirigiendo al login');
       navigate('/login');
       return;
     }
 
     setUser(currentUser);
     setProfileData(currentUser);
+    const permissions = authService.getUserPermissions();
+    setUserPermissions(permissions);
 
+    // 🔥 VERIFICAR SI ES PRIMER LOGIN Y MOSTRAR MODAL
+    if (currentUser.primer_login === true || currentUser.primer_login === 1) {
+      console.log('🟢 Es el primer login del cajero, mostrando modal de cambio de contraseña');
+      setShowChangePasswordModal(true);
+    }
+    
+    // Construir módulos organizados por categorías para cajeros
+    const modules = buildModulesFromPermissions(permissions);
+    setOrganizedModules(modules);
+    
+    // Inicializar categorías expandidas
+    const initialExpanded = {};
+    modules.forEach(category => {
+      initialExpanded[category.id] = category.defaultOpen !== false;
+    });
+    setExpandedCategories(initialExpanded);
+    
+    console.log('✅ Cajero autenticado:', {
+      nombre: currentUser.nombres,
+      rol: currentUser.rol?.nombre_rol,
+      permisos: permissions.length,
+      categorias: modules.length,
+      primer_login: currentUser.primer_login
+    });
+
+    // Verificar sesión
     const verifySession = async () => {
       const result = await authService.verifySession();
       if (!result.success) {
+        console.log('Sesión inválida, redirigiendo al login');
         navigate('/login');
       }
     };
@@ -65,22 +121,52 @@ const CajeroDashboard = () => {
     verifySession();
   }, [navigate]);
 
+  useEffect(() => {
+    if (user) {
+      loadCajeroData();
+    }
+  }, [user]);
+
+  const loadCajeroData = async () => {
+    try {
+      setDataLoading(true);
+      
+      // Aquí cargarías los datos específicos del cajero
+      // Por ahora usamos valores de ejemplo
+      setCajeroStats({
+        collectionsToday: 0,
+        transactionsToday: 0,
+        pendingInvoices: 0,
+        invoicesMonth: 0
+      });
+
+    } catch (error) {
+      console.error('Error cargando datos del cajero:', error);
+    } finally {
+      setDataLoading(false);
+    }
+  };
+
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
   const handleLogout = async () => {
     if (window.confirm('¿Estás seguro de que deseas cerrar sesión?')) {
       try {
         await authService.logout();
         navigate('/login');
       } catch (error) {
+        console.error('Error en logout:', error);
         navigate('/login');
       }
     }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    await loadCajeroData();
+    setLoading(false);
   };
 
   const handleMarkAsRead = (notificationId) => {
@@ -105,12 +191,35 @@ const CajeroDashboard = () => {
 
   const handleSaveProfile = async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUser(profileData);
-      setEditingProfile(false);
-      alert('Perfil actualizado correctamente');
+      if (!user?.id_usuario_sistema) {
+        throw new Error('No se encontró el ID del usuario');
+      }
+
+      const dataToUpdate = {
+        nombres: profileData.nombres,
+        apellidos: profileData.apellidos,
+        email: profileData.email,
+        telefono: profileData.telefono || null,
+        direccion: profileData.direccion || null,
+      };
+
+      const result = await userService.updateUser(user.id_usuario_sistema, dataToUpdate);
+      
+      if (result.success) {
+        setUser(prevUser => ({
+          ...prevUser,
+          ...result.data
+        }));
+        setProfileData(result.data);
+        setEditingProfile(false);
+        alert('Perfil actualizado correctamente');
+      } else {
+        alert(result.message || 'Error al actualizar el perfil');
+      }
+      
     } catch (error) {
-      alert('Error al actualizar el perfil');
+      console.error('❌ Error al actualizar perfil:', error);
+      alert(error.message || 'Error al actualizar el perfil');
     }
   };
 
@@ -126,11 +235,85 @@ const CajeroDashboard = () => {
     }));
   };
 
+  // 🔥 HANDLER PARA CERRAR EL MODAL DE CAMBIO DE CONTRASEÑA
+  const handleClosePasswordModal = () => {
+    // Solo permitir cerrar si NO es primer login
+    if (!user?.primer_login) {
+      setShowChangePasswordModal(false);
+    }
+  };
+
+  // 🔥 HANDLER PARA ÉXITO EN CAMBIO DE CONTRASEÑA
+  const handlePasswordChangeSuccess = async () => {
+    console.log('✅ Contraseña cambiada exitosamente');
+    
+    // Actualizar el estado del usuario para quitar primer_login
+    setUser(prevUser => ({
+      ...prevUser,
+      primer_login: false
+    }));
+
+    // Actualizar en el localStorage también
+    const currentUser = authService.getCurrentUser();
+    if (currentUser) {
+      currentUser.primer_login = false;
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    }
+
+    // Cerrar el modal
+    setShowChangePasswordModal(false);
+
+    // Recargar datos del cajero
+    await loadCajeroData();
+  };
+
+  const toggleCategory = (categoryId) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }));
+  };
+
   const getUserInitials = (nombres, apellidos) => {
     const firstInitial = nombres ? nombres.charAt(0).toUpperCase() : '';
     const lastInitial = apellidos ? apellidos.charAt(0).toUpperCase() : '';
     return firstInitial + lastInitial || 'C';
   };
+
+  // ============================================================================
+  // COMPONENTES
+  // ============================================================================
+
+  const StatCard = ({ stat }) => {
+    const IconComponent = stat.icon;
+    const TrendIcon = stat.trend === 'down' ? TrendingDown : TrendingUp;
+    
+    return (
+      <div className="stat-card">
+        <div className="stat-card-content">
+          <div className="stat-info">
+            <p className="stat-title">{stat.title}</p>
+            <p className="stat-value">{stat.value}</p>
+            {stat.change && (
+              <div className="stat-change">
+                <TrendIcon className={`stat-trend-icon ${stat.trend === 'up' ? 'trend-up' : 'trend-down'}`} />
+                <span className={`stat-change-text ${stat.trend === 'up' ? 'change-positive' : 'change-negative'}`}>
+                  {stat.change} vs mes anterior
+                </span>
+              </div>
+            )}
+          </div>
+          <div className={`stat-icon-wrapper bg-${stat.color}`}>
+            <IconComponent className={`stat-icon text-${stat.color}`} />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================================
+  // RENDER LOADING
+  // ============================================================================
 
   if (!user) {
     return (
@@ -143,79 +326,49 @@ const CajeroDashboard = () => {
     );
   }
 
-  const sidebarItems = [
-    { id: 'overview', label: 'Panel General', icon: BarChart3 },
-    { id: 'profile', label: 'Mi Perfil', icon: User },
-    { id: 'payments', label: 'Registrar Pagos', icon: DollarSign },
-    { id: 'invoices', label: 'Facturas', icon: FileText },
-    { id: 'receipts', label: 'Comprobantes', icon: Receipt },
-    { id: 'customers', label: 'Clientes', icon: Users },
-    { id: 'reports', label: 'Reportes de Caja', icon: BarChart3 }
-  ];
-
+  // Tarjetas de estadísticas del cajero
   const stats = [
     { 
       title: 'Cobros Hoy', 
-      value: '$0', 
-      change: '0%', 
+      value: dataLoading ? '...' : `$${cajeroStats.collectionsToday}`, 
+      change: '+0%', 
       color: 'blue',
       icon: DollarSign,
       trend: 'up'
     },
     { 
       title: 'Transacciones', 
-      value: '0', 
-      change: '0%', 
+      value: dataLoading ? '...' : cajeroStats.transactionsToday.toString(), 
+      change: '+0%', 
       color: 'green',
       icon: CheckCircle,
       trend: 'up'
     },
     { 
       title: 'Pendientes', 
-      value: '0', 
-      change: '0%', 
+      value: dataLoading ? '...' : cajeroStats.pendingInvoices.toString(), 
+      change: '+0%', 
       color: 'orange',
       icon: Clock,
       trend: 'down'
     },
     { 
       title: 'Facturas Mes', 
-      value: '0', 
-      change: '0%', 
+      value: dataLoading ? '...' : cajeroStats.invoicesMonth.toString(), 
+      change: '', 
       color: 'emerald',
       icon: FileText,
       trend: 'up'
     }
   ];
 
-  const StatCard = ({ stat }) => {
-    const IconComponent = stat.icon;
-    const TrendIcon = TrendingUp;
-    
-    return (
-      <div className="stat-card">
-        <div className="stat-card-content">
-          <div className="stat-info">
-            <p className="stat-title">{stat.title}</p>
-            <p className="stat-value">{stat.value}</p>
-            <div className="stat-change">
-              <TrendIcon className={`stat-trend-icon ${stat.trend === 'up' ? 'trend-up' : 'trend-down'}`} />
-              <span className={`stat-change-text ${stat.trend === 'up' ? 'change-positive' : 'change-negative'}`}>
-                {stat.change} vs mes anterior
-              </span>
-            </div>
-          </div>
-          <div className={`stat-icon-wrapper bg-${stat.color}`}>
-            <IconComponent className={`stat-icon text-${stat.color}`} />
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // ============================================================================
+  // RENDER PRINCIPAL
+  // ============================================================================
 
   return (
     <div className="dashboard">
-      {/* Sidebar */}
+      {/* Sidebar con Categorías Dinámicas */}
       <div className="sidebar">
         <div className="sidebar-header">
           <div className="logo-container">
@@ -230,20 +383,63 @@ const CajeroDashboard = () => {
         </div>
 
         <nav className="sidebar-nav">
-          {sidebarItems.map((item) => {
-            const IconComponent = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`nav-item ${activeSection === item.id ? 'active' : ''}`}
-              >
-                <IconComponent className="w-5 h-5" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+          {organizedModules.map((category) => (
+            <div key={category.id} className="nav-category">
+              {/* Header de categoría */}
+              {category.collapsible ? (
+                <button
+                  className="category-header"
+                  onClick={() => toggleCategory(category.id)}
+                >
+                  <div className="category-header-content">
+                    <category.icon className="w-4 h-4" />
+                    <span className="category-label">{category.label}</span>
+                  </div>
+                  {expandedCategories[category.id] ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+              ) : (
+                <div className="category-header-static">
+                  <category.icon className="w-4 h-4" />
+                  <span className="category-label">{category.label}</span>
+                </div>
+              )}
+
+              {/* Módulos de la categoría */}
+              {(!category.collapsible || expandedCategories[category.id]) && (
+                <div className="category-modules">
+                  {category.modules.map((module) => {
+                    const IconComponent = module.icon;
+                    return (
+                      <button
+                        key={module.id}
+                        onClick={() => setActiveSection(module.id)}
+                        className={`nav-item ${activeSection === module.id ? 'active' : ''}`}
+                        title={module.description || module.label}
+                      >
+                        <IconComponent className="w-5 h-5" />
+                        <span>{module.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
         </nav>
+
+        {/* Información de permisos del usuario */}
+        <div className="sidebar-footer">
+          <div className="user-permissions-info">
+            <Shield className="w-4 h-4 text-gray-400" />
+            <span className="text-xs text-gray-500">
+              {userPermissions.length} permisos activos
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -272,8 +468,9 @@ const CajeroDashboard = () => {
                 className={`refresh-btn ${loading ? 'loading' : ''}`}
                 onClick={handleRefresh}
                 title="Actualizar datos"
+                disabled={loading}
               >
-                <RefreshCw className="w-5 h-5" />
+                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
               </button>
 
               {/* Notifications */}
@@ -287,7 +484,7 @@ const CajeroDashboard = () => {
               <UserProfile
                 user={user}
                 onLogout={handleLogout}
-                onProfileClick={handleProfileClick}
+                onViewProfile={handleProfileClick}
                 onSettingsClick={handleSettingsClick}
               />
             </div>
@@ -338,10 +535,17 @@ const CajeroDashboard = () => {
                     <h3 className="card-title">Resumen de Caja del Día</h3>
                   </div>
                   <div className="activity-list">
-                    <div className="empty-state">
-                      <CreditCard className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>No hay transacciones registradas hoy</p>
-                    </div>
+                    {dataLoading ? (
+                      <div className="loading-state">
+                        <RefreshCw className="w-6 h-6 animate-spin" />
+                        <p>Cargando datos...</p>
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <CreditCard className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                        <p>No hay transacciones registradas hoy</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -493,8 +697,8 @@ const CajeroDashboard = () => {
                           Rol del Sistema
                         </label>
                         <div className="form-value">
-                          <span className={`role-badge ${profileData.rol?.toLowerCase()}`}>
-                            {profileData.rol || 'Cajero'}
+                          <span className={`role-badge ${profileData.rol?.nombre_rol?.toLowerCase()}`}>
+                            {profileData.rol?.nombre_rol || 'Cajero'}
                           </span>
                         </div>
                       </div>
@@ -518,48 +722,28 @@ const CajeroDashboard = () => {
             </div>
           )}
 
-          {/* Otras secciones */}
-          {activeSection === 'payments' && (
+          {/* Secciones genéricas para otros módulos */}
+          {!['overview', 'profile'].includes(activeSection) && (
             <div className="section-placeholder">
               <DollarSign className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Registrar Pagos</h2>
-              <p>Módulo para registrar y procesar pagos de clientes.</p>
-            </div>
-          )}
-
-          {activeSection === 'invoices' && (
-            <div className="section-placeholder">
-              <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Gestión de Facturas</h2>
-              <p>Consulta y gestiona las facturas del sistema.</p>
-            </div>
-          )}
-
-          {activeSection === 'receipts' && (
-            <div className="section-placeholder">
-              <Receipt className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Comprobantes de Pago</h2>
-              <p>Genera y consulta comprobantes de pago.</p>
-            </div>
-          )}
-
-          {activeSection === 'customers' && (
-            <div className="section-placeholder">
-              <Users className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Gestión de Clientes</h2>
-              <p>Consulta información de clientes y su historial de pagos.</p>
-            </div>
-          )}
-
-          {activeSection === 'reports' && (
-            <div className="section-placeholder">
-              <BarChart3 className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Reportes de Caja</h2>
-              <p>Genera reportes de cierre de caja y movimientos.</p>
+              <h2>Módulo en Desarrollo</h2>
+              <p>Esta sección estará disponible próximamente.</p>
             </div>
           )}
         </main>
       </div>
+
+      {/* 🔥 MODAL DE CAMBIO DE CONTRASEÑA */}
+      {user && (
+        <ChangePasswordModal
+          isOpen={showChangePasswordModal}
+          onClose={handleClosePasswordModal}
+          userId={user.id_usuario_sistema}
+          userEmail={user.email}
+          isPrimerLogin={user.primer_login === true || user.primer_login === 1}
+          onSuccess={handlePasswordChangeSuccess}
+        />
+      )}
     </div>
   );
 };

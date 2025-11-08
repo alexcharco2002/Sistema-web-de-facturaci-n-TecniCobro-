@@ -201,51 +201,54 @@ class AuthService {
     }
   }
 
-  /**
-   * Verificar si el usuario tiene un permiso específico
-   * @param {string} moduleName - Nombre del módulo (ej: 'usuarios', 'lecturas')
-   * @param {string} actionType - Tipo de acción (ej:  'leer', 'actualizar', 'eliminar')
-   */
- hasPermission(moduleName, actionType = null) {
+/**
+ * Verificar si el usuario tiene un permiso específico
+ * @param {string} moduleName - Nombre del módulo (ej: 'usuarios', 'lecturas')
+ * @param {string} actionType - Tipo de acción (ej: 'lectura', 'crear', 'eliminar')
+ */
+hasPermission(moduleName, actionType = null) {
   if (!this.permissions || this.permissions.length === 0) {
     console.warn('⚠️ No hay permisos cargados');
     return false;
   }
 
-  // Normalizar el nombre del módulo a minúsculas
+  // Normalizar los parámetros
   moduleName = moduleName.toLowerCase();
-  
+  const requestedAction = actionType ? actionType.toLowerCase() : null;
+
+  // Recorremos los permisos del usuario
   const hasAccess = this.permissions.some(perm => {
-    if (!perm.nombre_accion) return false;
+    if (!perm.nombre_accion || !perm.tipo_accion) return false;
 
-    // Separar módulo y acción del permiso
-    const [permModule, permAction] = perm.nombre_accion.split('.');
-    const moduleLower = permModule.toLowerCase();
-    const actionLower = permAction?.toLowerCase();
+    const permModule = perm.nombre_accion.toLowerCase();
+    const permAction = perm.tipo_accion.toLowerCase();
 
-    // ✅ CAMBIO CLAVE: Si no se especifica acción, 
-    // verificar si tiene CUALQUIER permiso sobre el módulo
-    if (!actionType) {
-      return moduleLower === moduleName;
-    }
-
-    // Normalizar el tipo de acción solicitado
-    const requestedAction = actionType.toLowerCase();
-
-    // Si tiene permiso CRUD, tiene acceso a TODAS las acciones
-    if (moduleLower === moduleName && actionLower === 'crud') {
+    // ✅ Si coincide el módulo y no se especifica una acción, ya tiene acceso
+    if (permModule === moduleName && !requestedAction) {
       return true;
     }
 
-    // Verificar coincidencia exacta de módulo y acción
-    if (moduleLower === moduleName && actionLower === requestedAction) {
-      return true;
-    }
-
-    // ✅ LÓGICA ADICIONAL: CRUD implica todas las acciones básicas
-    if (moduleLower === moduleName && actionLower === 'crud') {
-      const basicActions = ['crear', 'leer', 'actualizar', 'eliminar'];
+    // ✅ Si el permiso es CRUD, tiene todas las acciones básicas
+    if (permModule === moduleName && permAction === 'operaciones crud') {
+      const basicActions = [
+        'lectura',
+        'escritura',
+        'eliminacion',
+        'administracion',
+        'reportes',
+        'configuracion',
+        'crear',
+        'editar',
+        'actualizar',
+        'borrar',
+        'eliminar'
+      ];
       return basicActions.includes(requestedAction);
+    }
+
+    // ✅ Coincidencia exacta de módulo + tipo de acción
+    if (permModule === moduleName && permAction === requestedAction) {
+      return true;
     }
 
     return false;
@@ -254,6 +257,7 @@ class AuthService {
   console.log(`🔐 Verificando permiso: ${moduleName}${actionType ? '.' + actionType : '.*'} = ${hasAccess}`);
   return hasAccess;
 }
+
 
 /**
  * Verificar acción específica en un módulo

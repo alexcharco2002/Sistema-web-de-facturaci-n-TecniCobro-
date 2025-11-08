@@ -44,7 +44,14 @@ class ChangePasswordRequest(BaseModel):
             raise ValueError('La contraseña debe tener al menos 6 caracteres')
         return v
 
+class ChangePasswordFirstLoginRequest(BaseModel):
+    new_password: str
 
+    @validator('new_password')
+    def validate_password_length(cls, v):
+        if len(v) < 6:
+            raise ValueError('La contraseña debe tener al menos 6 caracteres')
+        return v
 # ========================================
 # SCHEMAS DE CREACIÓN
 # ========================================

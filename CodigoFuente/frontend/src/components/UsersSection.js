@@ -1,9 +1,9 @@
-
 // src/components/users/UsersSection.js
-// MODULO DE USUARIOS - Actualizado para arquitectura con roles separados
+// MODULO DE USUARIOS - Con control de permisos granular
 import React, { useState, useEffect, useCallback } from 'react';
 import './styleModeUser.css';
 import usersService from '../services/userServices';
+import authService from '../services/authServices'; // 🔑 Importar authService
 
 import { 
   Users, Plus, Search, Edit, Trash2, Eye, UserCheck, UserX,
@@ -13,7 +13,7 @@ import {
 
 const UsersSection = () => {
   const [users, setUsers] = useState([]);
-  const [roles, setRoles] = useState([]); // 🆕 Lista de roles desde t_roles
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
@@ -31,7 +31,7 @@ const UsersSection = () => {
     email: '',
     telefono: '',
     direccion: '',
-    id_rol: null, // 🔑 Ahora usamos id_rol en lugar de rol
+    id_rol: null,
     activo: true
   });
   const [passwordData, setPasswordData] = useState({
@@ -41,10 +41,59 @@ const UsersSection = () => {
   });
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // 🆕 Cargar roles al montar el componente
+  // 🔑 PERMISOS DEL USUARIO ACTUAL
+  const [permissions, setPermissions] = useState({
+    canCreate: false,
+    canRead: false,
+    canUpdate: false,
+    canDelete: false,
+    canChangePassword: false,
+    canChangePhoto: false,
+    canToggleStatus: false
+  });
+
+  // 🔑 Cargar permisos al montar el componente
   useEffect(() => {
+    loadUserPermissions();
     loadRoles();
   }, []);
+
+  const loadUserPermissions = () => {
+    // Verificar permisos sobre el módulo 'usuarios'
+    const canCreate = authService.hasPermission('usuarios', 'crear') || 
+                     authService.hasPermission('usuarios', 'crud');
+    
+    const canRead = authService.hasPermission('usuarios', 'lectura') || 
+                   authService.hasPermission('usuarios', 'crud');
+    
+    const canUpdate = authService.hasPermission('usuarios', 'actualizar') || 
+                     authService.hasPermission('usuarios', 'crud');
+    
+    const canDelete = authService.hasPermission('usuarios', 'eliminar') || 
+                     authService.hasPermission('usuarios', 'crud');
+
+    // Permisos adicionales (puedes personalizarlos según tu sistema)
+    const canChangePassword = canUpdate; // Cambiar contraseña requiere actualizar
+    const canChangePhoto = canUpdate; // Cambiar foto requiere actualizar
+    const canToggleStatus = canUpdate; // Cambiar estado requiere actualizar
+
+    setPermissions({
+      canCreate,
+      canRead,
+      canUpdate,
+      canDelete,
+      canChangePassword,
+      canChangePhoto,
+      canToggleStatus
+    });
+
+    console.log('🔐 Permisos del usuario en módulo Usuarios:', {
+      canCreate,
+      canRead,
+      canUpdate,
+      canDelete
+    });
+  };
 
   const loadRoles = async () => {
     try {
@@ -61,13 +110,20 @@ const UsersSection = () => {
   };
 
   const fetchUsers = useCallback(async () => {
+    // 🔑 Verificar si tiene permiso de lectura
+    if (!permissions.canRead) {
+      setError('No tienes permiso para ver usuarios');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
     try {
       const result = await usersService.getUsers({
         search: debouncedSearchTerm,
-        id_rol: filterRole === 'all' ? undefined : filterRole // 🔑 Filtrar por id_rol
+        id_rol: filterRole === 'all' ? undefined : filterRole
       });
 
       if (result.success) {
@@ -83,12 +139,14 @@ const UsersSection = () => {
     } finally {
       setLoading(false);
     }
-  }, [filterRole, debouncedSearchTerm]);
+  }, [filterRole, debouncedSearchTerm, permissions.canRead]);
 
   useEffect(() => {
-    console.log('🔄 Componente montado, cargando usuarios...');
-    fetchUsers();
-  }, [fetchUsers]);
+    if (permissions.canRead) {
+      console.log('🔄 Componente montado, cargando usuarios...');
+      fetchUsers();
+    }
+  }, [fetchUsers, permissions.canRead]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -98,8 +156,10 @@ const UsersSection = () => {
   }, [searchTerm]);
 
   useEffect(() => {
-    fetchUsers();
-  }, [debouncedSearchTerm, filterRole, fetchUsers]);
+    if (permissions.canRead) {
+      fetchUsers();
+    }
+  }, [debouncedSearchTerm, filterRole, fetchUsers, permissions.canRead]);
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
@@ -113,6 +173,24 @@ const UsersSection = () => {
   });
 
   const openModal = (type, user = null) => {
+    // 🔑 Verificar permisos antes de abrir modal
+    if (type === 'create' && !permissions.canCreate) {
+      alert('❌ No tienes permiso para crear usuarios');
+      return;
+    }
+    if (type === 'edit' && !permissions.canUpdate) {
+      alert('❌ No tienes permiso para editar usuarios');
+      return;
+    }
+    if (type === 'password' && !permissions.canChangePassword) {
+      alert('❌ No tienes permiso para cambiar contraseñas');
+      return;
+    }
+    if (type === 'photo' && !permissions.canChangePhoto) {
+      alert('❌ No tienes permiso para cambiar fotos de perfil');
+      return;
+    }
+
     setModalType(type);
     setSelectedUser(user);
     setError(null);
@@ -127,7 +205,7 @@ const UsersSection = () => {
         email: '',
         telefono: '',
         direccion: '',
-        id_rol: roles.length > 0 ? roles[0].id_rol : null, // 🔑 Seleccionar primer rol por defecto
+        id_rol: roles.length > 0 ? roles[0].id_rol : null,
         activo: true
       });
     } else if (type === 'edit' && user) {
@@ -140,7 +218,7 @@ const UsersSection = () => {
         email: user.email,
         telefono: user.telefono || '',
         direccion: user.direccion || '',
-        id_rol: user.id_rol, // 🔑 ID del rol
+        id_rol: user.id_rol,
         activo: user.activo
       });
     } else if (type === 'password' && user) {
@@ -171,7 +249,11 @@ const UsersSection = () => {
       let result;
 
       if (modalType === "create") {
-        // ✅ Enviar id_rol en lugar de rol
+        if (!permissions.canCreate) {
+          setError('No tienes permiso para crear usuarios');
+          return;
+        }
+
         result = await usersService.createUser(formData);
 
         if (result.success) {
@@ -191,7 +273,11 @@ const UsersSection = () => {
         }
 
       } else if (modalType === "edit") {
-        // ✅ Actualizar con id_rol
+        if (!permissions.canUpdate) {
+          setError('No tienes permiso para editar usuarios');
+          return;
+        }
+
         result = await usersService.updateUser(selectedUser.id, formData);
         
         if (result.success) {
@@ -212,6 +298,11 @@ const UsersSection = () => {
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setError(null);
+
+    if (!permissions.canChangePassword) {
+      setError('No tienes permiso para cambiar contraseñas');
+      return;
+    }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setError('Las contraseñas no coinciden');
@@ -244,6 +335,11 @@ const UsersSection = () => {
     e.preventDefault();
     setError(null);
 
+    if (!permissions.canChangePhoto) {
+      setError('No tienes permiso para cambiar fotos de perfil');
+      return;
+    }
+
     if (!selectedFile) {
       setError('Debe seleccionar una imagen');
       return;
@@ -265,6 +361,12 @@ const UsersSection = () => {
   };
 
   const handleDelete = async (userId) => {
+    // 🔑 Verificar permiso antes de eliminar
+    if (!permissions.canDelete) {
+      alert('❌ No tienes permiso para eliminar usuarios');
+      return;
+    }
+
     if (window.confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
       try {
         const result = await usersService.deleteUser(userId);
@@ -282,6 +384,12 @@ const UsersSection = () => {
   };
 
   const toggleUserStatus = async (userId) => {
+    // 🔑 Verificar permiso antes de cambiar estado
+    if (!permissions.canToggleStatus) {
+      alert('❌ No tienes permiso para cambiar el estado de usuarios');
+      return;
+    }
+
     try {
       const result = await usersService.toggleUserStatus(userId);
       
@@ -295,7 +403,6 @@ const UsersSection = () => {
     }
   };
 
-  // 🆕 Función auxiliar para obtener el nombre del rol
   const getRoleName = (user) => {
     if (user.rol && user.rol.nombre_rol) {
       return user.rol.nombre_rol;
@@ -319,6 +426,17 @@ const UsersSection = () => {
       </span>
     );
   };
+
+  // 🔑 Mostrar mensaje si no tiene permiso de lectura
+  if (!permissions.canRead) {
+    return (
+      <div className="section-placeholder">
+        <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-400" />
+        <h2>Acceso Denegado</h2>
+        <p>No tienes permiso para acceder al módulo de usuarios.</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -348,16 +466,19 @@ const UsersSection = () => {
     <div className="users-section">
       <div className="section-header">
         <div className="section-title">
-          <Users className="w-6 h-6 text-blue-600" />
+          <Users className="w-7 h-7 text-blue-600" />
           <h2>Gestión de Usuarios</h2>
         </div>
-        <button 
-          className="btn-primary"
-          onClick={() => openModal('create')}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Usuario
-        </button>
+        {/* 🔑 Botón "Nuevo Usuario" solo si tiene permiso de crear */}
+        {permissions.canCreate && (
+          <button 
+            className="btn-primary"
+            onClick={() => openModal('create')}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Usuario
+          </button>
+        )}
       </div>
 
       <div className="filters-section">
@@ -372,7 +493,6 @@ const UsersSection = () => {
           />
         </div>
         
-        {/* 🆕 Filtro dinámico de roles desde t_roles */}
         <select 
           className="filter-select"
           value={filterRole}
@@ -451,6 +571,7 @@ const UsersSection = () => {
               </div>
               
               <div className="user-actions">
+                {/* 🔑 Botón "Ver detalles" - siempre visible si tiene permiso de lectura */}
                 <button 
                   className="action-btn view"
                   onClick={() => openModal('view', user)}
@@ -458,41 +579,61 @@ const UsersSection = () => {
                 >
                   <Eye className="w-4 h-4 icon-view" />
                 </button>
-                <button 
-                  className="action-btn edit"
-                  onClick={() => openModal('edit', user)}
-                  title="Editar usuario"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button 
-                  className="action-btn"
-                  onClick={() => openModal('password', user)}
-                  title="Cambiar contraseña"
-                >
-                  <Key className="w-4 h-4" />
-                </button>
-                <button 
-                  className="action-btn"
-                  onClick={() => openModal('photo', user)}
-                  title="Cambiar foto"
-                >
-                  <ImageIcon className="w-4 h-4" />
-                </button>
-                <button 
-                  className="action-btn toggle"
-                  onClick={() => toggleUserStatus(user.id)}
-                  title={user.activo ? 'Desactivar' : 'Activar'}
-                >
-                  {user.activo ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                </button>
-                <button 
-                  className="action-btn delete"
-                  onClick={() => handleDelete(user.id)}
-                  title="Eliminar usuario"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+
+                {/* 🔑 Botón "Editar" - solo si tiene permiso de actualizar */}
+                {permissions.canUpdate && (
+                  <button 
+                    className="action-btn edit"
+                    onClick={() => openModal('edit', user)}
+                    title="Editar usuario"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* 🔑 Botón "Cambiar contraseña" - solo si tiene permiso */}
+                {permissions.canChangePassword && (
+                  <button 
+                    className="action-btn"
+                    onClick={() => openModal('password', user)}
+                    title="Cambiar contraseña"
+                  >
+                    <Key className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* 🔑 Botón "Cambiar foto" - solo si tiene permiso */}
+                {permissions.canChangePhoto && (
+                  <button 
+                    className="action-btn"
+                    onClick={() => openModal('photo', user)}
+                    title="Cambiar foto"
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* 🔑 Botón "Activar/Desactivar" - solo si tiene permiso */}
+                {permissions.canToggleStatus && (
+                  <button 
+                    className="action-btn toggle"
+                    onClick={() => toggleUserStatus(user.id)}
+                    title={user.activo ? 'Desactivar' : 'Activar'}
+                  >
+                    {user.activo ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                  </button>
+                )}
+
+                {/* 🔑 Botón "Eliminar" - solo si tiene permiso de eliminar */}
+                {permissions.canDelete && (
+                  <button 
+                    className="action-btn delete"
+                    onClick={() => handleDelete(user.id)}
+                    title="Eliminar usuario"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
             
@@ -727,7 +868,6 @@ const UsersSection = () => {
                       />
                     </div>
 
-                    {/* 🆕 Select dinámico de roles desde t_roles */}
                     <div className="form-group">
                       <label>Rol *</label>
                       <select
@@ -820,8 +960,6 @@ const UsersSection = () => {
                 </form>
               )}
 
-
-              
               {/* MODAL DE CAMBIO DE FOTO */}
               {modalType === 'photo' && (
                 <form onSubmit={handleUploadPhoto} className="user-form">

@@ -1,12 +1,10 @@
 // src/pages/admin/Dashboard.js
-// Dashboard con Sidebar Organizado por Categorías
+// Dashboard con Modal de Cambio de Contraseña para Primer Login
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../../services/authServices';
 import userService from '../../services/userServices';
-
-
 
 // Importar configuración de módulos
 import { buildModulesFromPermissions } from '../../utils/modulesDefinitions';
@@ -19,6 +17,8 @@ import InvoicesSection from '../../components/InvoicesSection';
 import ProfileSection from '../../components/ProfileSection';
 import RolesSection from '../../components/RolesSection'; 
 import SectorsSection from '../../components/SectorsSection';
+import ChangePasswordModal from '../../components/ChangePasswordModal';
+import NotificationsSection  from '../../components/NotificationsSection';
 
 // Estilos
 import './style.css';
@@ -39,6 +39,9 @@ const AdminDashboard = () => {
   const [userPermissions, setUserPermissions] = useState([]);
   const [organizedModules, setOrganizedModules] = useState([]);
   const [expandedCategories, setExpandedCategories] = useState({});
+  
+  // Estados para el modal de cambio de contraseña
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -57,7 +60,7 @@ const AdminDashboard = () => {
   // ============================================================================
   // EFECTOS Y CARGA DE DATOS
   // ============================================================================
-
+  
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
     
@@ -70,6 +73,12 @@ const AdminDashboard = () => {
     setUser(currentUser);
     const permissions = authService.getUserPermissions();
     setUserPermissions(permissions);
+
+    // 🔥 VERIFICAR SI ES PRIMER LOGIN Y MOSTRAR MODAL
+    if (currentUser.primer_login === true || currentUser.primer_login === 1) {
+      console.log('🟢 Es el primer login, mostrando modal de cambio de contraseña');
+      setShowChangePasswordModal(true);
+    }
     
     // Construir módulos organizados por categorías
     const modules = buildModulesFromPermissions(permissions);
@@ -86,7 +95,8 @@ const AdminDashboard = () => {
       nombre: currentUser.nombres,
       rol: currentUser.rol?.nombre_rol,
       permisos: permissions.length,
-      categorias: modules.length
+      categorias: modules.length,
+      primer_login: currentUser.primer_login
     });
 
     // Verificar sesión
@@ -179,7 +189,11 @@ const AdminDashboard = () => {
   };
 
   const handleViewAllNotifications = () => {
-    console.log('Ver todas las notificaciones');
+    setActiveSection('notifications');
+    setExpandedCategories(prev => ({
+      ...prev,
+      SYSTEM: true // 👈 esta es la categoría de "Notificaciones"
+    }));
   };
 
   const handleSettingsClick = () => {
@@ -228,6 +242,38 @@ const AdminDashboard = () => {
         message: error.message || 'Error al actualizar el perfil'
       };
     }
+  };
+
+  // 🔥 HANDLER PARA CERRAR EL MODAL DE CAMBIO DE CONTRASEÑA
+  const handleClosePasswordModal = () => {
+    // Solo permitir cerrar si NO es primer login
+    if (!user?.primer_login) {
+      setShowChangePasswordModal(false);
+    }
+  };
+
+  // 🔥 HANDLER PARA ÉXITO EN CAMBIO DE CONTRASEÑA
+  const handlePasswordChangeSuccess = async () => {
+    console.log('✅ Contraseña cambiada exitosamente');
+    
+    // Actualizar el estado del usuario para quitar primer_login
+    setUser(prevUser => ({
+      ...prevUser,
+      primer_login: false
+    }));
+
+    // Actualizar en el localStorage también
+    const currentUser = authService.getCurrentUser();
+    if (currentUser) {
+      currentUser.primer_login = false;
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    }
+
+    // Cerrar el modal
+    setShowChangePasswordModal(false);
+
+    // Recargar datos del dashboard
+    await loadDashboardData();
   };
 
   const toggleCategory = (categoryId) => {
@@ -442,6 +488,9 @@ const AdminDashboard = () => {
                 notifications={notifications}
                 onMarkAsRead={handleMarkAsRead}
                 onViewAll={handleViewAllNotifications}
+                setActiveSection={setActiveSection}
+                organizedModules={organizedModules}
+                setExpandedCategories={setExpandedCategories}
               />
 
               {/* User Profile */}
@@ -581,7 +630,7 @@ const AdminDashboard = () => {
             <InvoicesSection />
           )}
 
-          {/*Role Seccion   */}
+          {/* Role Section */}
           {activeSection === 'roles' && (
             <RolesSection />
           )}
@@ -591,8 +640,13 @@ const AdminDashboard = () => {
             <SectorsSection />
           )}
 
+          {/* notificacion page */}
+          {activeSection === 'notifications' && (
+            <NotificationsSection />
+          )}
+
           {/* Secciones genéricas para otros módulos */}
-          {!['overview', 'profile', 'users', 'invoices','roles', 'sectors' ].includes(activeSection) && (
+          {!['overview', 'profile', 'users', 'invoices', 'roles', 'sectors'].includes(activeSection) && (
             <div className="section-placeholder">
               <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
               <h2>Módulo en Desarrollo</h2>
@@ -601,6 +655,18 @@ const AdminDashboard = () => {
           )}
         </main>
       </div>
+
+      {/* 🔥 MODAL DE CAMBIO DE CONTRASEÑA */}
+      {user && (
+        <ChangePasswordModal
+          isOpen={showChangePasswordModal}
+          onClose={handleClosePasswordModal}
+          userId={user.id_usuario_sistema}
+          userEmail={user.email}
+          isPrimerLogin={user.primer_login === true || user.primer_login === 1}
+          onSuccess={handlePasswordChangeSuccess}
+        />
+      )}
     </div>
   );
 };

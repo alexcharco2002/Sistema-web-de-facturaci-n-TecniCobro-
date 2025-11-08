@@ -1,4 +1,5 @@
 // src/pages/ResetPassword.js
+// Página para restablecer la contraseña usando un token de recuperación
 import React, { useState, useEffect, useCallback } from 'react';
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle, Loader, ArrowLeft } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';

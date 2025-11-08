@@ -57,29 +57,43 @@ const RolesSection = () => {
   });
 
   const tiposAccion = [
-    'Operaciones CRUD',
-    'Lectura',
-    'Escritura',
-    'Eliminación',
-    'Administración',
-    'Reportes',
-    'Configuración'
+    { value: 'Operaciones CRUD', label: 'Todas los permisos (Lectura, Crear, Actualizar y Eliminar)' },
+    { value: 'Lectura', label: 'Lectura' },
+    { value: 'Crear', label: 'Crear' },
+    { value: 'Actualizar', label: 'Actualizar' },
+    { value: 'Eliminar', label: 'Eliminar' }
   ];
 
+
   const modulosSistema = [
-    { value: 'Usuarios.crud', label: 'Usuarios - CRUD Completo' },
-    { value: 'Usuarios.read', label: 'Usuarios - Solo Lectura' },
-    { value: 'Afiliados.crud', label: 'Afiliados - CRUD Completo' },
-    { value: 'Afiliados.read', label: 'Afiliados - Solo Lectura' },
-    { value: 'Lecturas.crud', label: 'Lecturas - CRUD Completo' },
-    { value: 'Lecturas.read', label: 'Lecturas - Solo Lectura' },
-    { value: 'Facturacion.crud', label: 'Facturación - CRUD Completo' },
-    { value: 'Facturacion.read', label: 'Facturación - Solo Lectura' },
-    { value: 'Reportes.view', label: 'Reportes - Visualización' },
-    { value: 'Reportes.export', label: 'Reportes - Exportación' },
-    { value: 'Configuracion.edit', label: 'Configuración - Edición' },
-    { value: 'Dashboard.view', label: 'Dashboard - Visualización' }
+    // 🧍‍♂️ Usuarios
+    { value: 'Usuarios', label: 'Usuarios' },
+   
+    // 🔐 Roles y Permiso
+    { value: 'Roles', label: 'Roles' },
+
+    // 👥 Afiliados
+    { value: 'Afiliados', label: 'Afiliados' },
+
+    // 📊 Lecturas
+    { value: 'Lecturas', label: 'Lecturas' },
+
+    // 🧾 Facturas
+    { value: 'Facturas', label: 'Facturas' },
+
+    // 💰 Pagos
+    { value: 'Pagos', label: 'Pagos' },
+
+    // ⚠️ Multas
+    { value: 'Multas', label: 'Multas' },
+
+    // ⚙️ Configuración
+    { value: 'Configuracion', label: 'Configuración' },
+
+    // notificaciones
+    { value: 'Notificaciones', label: 'Notificaciones' },
   ];
+
 
   useEffect(() => {
     fetchRoles();
@@ -159,16 +173,16 @@ const RolesSection = () => {
     } else if (type === 'create-action') {
       setActionFormData({
         nombre_accion: '',
-        tipo_accion: 'Operaciones CRUD',
+        tipo_accion: '',
         activo: true
       });
       setShowModal(true);
     } else if (type === 'edit-action' && item) {
-       setSelectedAction(item); // ✅ Establecer la acción que se está editando
+      setSelectedAction(item); // ✅ Establecer la acción que se está editando
       setActionFormData({
-        nombre_accion: item.nombre_accion,
-        tipo_accion: item.tipo_accion,
-        activo: item.activo
+      nombre_accion: item.nombre_accion,
+      tipo_accion: item.tipo_accion,
+      activo: item.activo
       });
       setShowModal(true);
     }
@@ -725,9 +739,13 @@ const RolesSection = () => {
                         value={actionFormData.tipo_accion}
                         onChange={(e) => setActionFormData({...actionFormData, tipo_accion: e.target.value})}
                       >
+                        <option value="">Seleccione un tipo de acciones...</option>
                         {tiposAccion.map(tipo => (
-                          <option key={tipo} value={tipo}>{tipo}</option>
+                          <option key={tipo.value} value={tipo.value}>
+                            {tipo.label}
+                          </option>
                         ))}
+
                       </select>
                     </div>
 

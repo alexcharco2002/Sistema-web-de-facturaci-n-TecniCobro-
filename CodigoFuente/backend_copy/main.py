@@ -6,6 +6,7 @@ from routes import auth
 from routes import user
 from routes import roles
 from routes import sectors
+from routes import notifications
 import os
 
 app = FastAPI(
@@ -40,6 +41,7 @@ app.include_router(auth.router)
 app.include_router(user.router)
 app.include_router(roles.router)
 app.include_router(sectors.router)
+app.include_router(notifications.router)
 
 
 # Health check general

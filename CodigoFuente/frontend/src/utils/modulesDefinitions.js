@@ -45,7 +45,7 @@ export const CATEGORIES = {
     icon: Users,
     order: 1,
     collapsible: true,
-    defaultOpen: true,
+    defaultOpen: false,
   },
   OPERATIONS: {
     id: "OPERATIONS",
@@ -53,7 +53,7 @@ export const CATEGORIES = {
     icon: Briefcase,
     order: 2,
     collapsible: true,
-    defaultOpen: true,
+    defaultOpen: false,
   },
   FINANCIAL: {
     id: "FINANCIAL",
