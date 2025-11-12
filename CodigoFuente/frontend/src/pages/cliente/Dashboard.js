@@ -13,6 +13,11 @@ import { buildModulesFromPermissions } from '../../utils/modulesDefinitions';
 import NotificationDropdown from '../../components/NotificationDropdown';
 import UserProfile from '../../components/UserProfile';
 import ChangePasswordModal from '../../components/ChangePasswordModal';
+import ProfileSection from '../../components/ProfileSection';
+import NotificationsSection from '../../components/NotificationsSection';
+import UsersSection from '../../components/UsersSection';
+import RolesSection from '../../components/RolesSection';
+import SectorsSection from '../../components/SectorsSection';
 
 // Importar iconos
 import { 
@@ -20,14 +25,6 @@ import {
   Search,
   Droplets,
   RefreshCw,
-  User,
-  Edit,
-  Save,
-  X,
-  Camera,
-  Mail,
-  Phone,
-  MapPin,
   Shield,
   CreditCard,
   Activity,
@@ -37,9 +34,17 @@ import {
   TrendingUp,
   TrendingDown,
   ChevronDown,
-  ChevronRight,
-  Calendar
+  ChevronRight
 } from 'lucide-react';
+
+// 📦 Mapeo de componentes dinámicos para módulos del cliente
+const componentMap = {
+  UsersSection,
+  ProfileSection,
+  NotificationsSection,
+  RolesSection,
+  SectorsSection
+};
 
 const ClienteDashboard = () => {
   const navigate = useNavigate();
@@ -50,11 +55,54 @@ const ClienteDashboard = () => {
   const [userPermissions, setUserPermissions] = useState([]);
   const [organizedModules, setOrganizedModules] = useState([]);
   const [expandedCategories, setExpandedCategories] = useState({});
-  const [editingProfile, setEditingProfile] = useState(false);
-  const [profileData, setProfileData] = useState({});
 
   // Estados para el modal de cambio de contraseña
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+
+  // Handler para actualizar perfil
+  const handleUpdateProfile = async (profileData) => {
+    try {
+      if (!user?.id_usuario_sistema) {
+        throw new Error('No se encontró el ID del usuario');
+      }
+
+      const dataToUpdate = {
+        nombres: profileData.nombres,
+        apellidos: profileData.apellidos,
+        sexo: profileData.sexo,
+        fecha_nac: profileData.fecha_nac,
+        email: profileData.email,
+        telefono: profileData.telefono || null,
+        direccion: profileData.direccion || null,
+      };
+
+      const result = await userService.updateUser(user.id_usuario_sistema, dataToUpdate);
+      
+      if (result.success) {
+        setUser(prevUser => ({
+          ...prevUser,
+          ...result.data
+        }));
+        
+        return { 
+          success: true,
+          message: 'Perfil actualizado correctamente'
+        };
+      } else {
+        return { 
+          success: false, 
+          message: result.message || 'Error al actualizar el perfil'
+        };
+      }
+      
+    } catch (error) {
+      console.error('❌ Error al actualizar perfil:', error);
+      return { 
+        success: false, 
+        message: error.message || 'Error al actualizar el perfil'
+      };
+    }
+  };
 
   // Estados para datos del cliente
   const [clientStats, setClientStats] = useState({
@@ -79,7 +127,6 @@ const ClienteDashboard = () => {
     }
 
     setUser(currentUser);
-    setProfileData(currentUser);
     const permissions = authService.getUserPermissions();
     setUserPermissions(permissions);
 
@@ -171,9 +218,13 @@ const ClienteDashboard = () => {
   const handleMarkAsRead = (notificationId) => {
     console.log('Marcar como leída:', notificationId);
   };
-
+  
   const handleViewAllNotifications = () => {
-    console.log('Ver todas las notificaciones');
+    setActiveSection('notifications');
+    setExpandedCategories(prev => ({
+      ...prev,
+      SYSTEM: true // 👈 esta es la categoría de "Notificaciones"
+    }));
   };
 
   const handleProfileClick = () => {
@@ -182,56 +233,6 @@ const ClienteDashboard = () => {
 
   const handleSettingsClick = () => {
     setActiveSection('settings');
-  };
-
-  const handleEditProfile = () => {
-    setEditingProfile(true);
-  };
-
-  const handleSaveProfile = async () => {
-    try {
-      if (!user?.id_usuario_sistema) {
-        throw new Error('No se encontró el ID del usuario');
-      }
-
-      const dataToUpdate = {
-        nombres: profileData.nombres,
-        apellidos: profileData.apellidos,
-        email: profileData.email,
-        telefono: profileData.telefono || null,
-        direccion: profileData.direccion || null,
-      };
-
-      const result = await userService.updateUser(user.id_usuario_sistema, dataToUpdate);
-      
-      if (result.success) {
-        setUser(prevUser => ({
-          ...prevUser,
-          ...result.data
-        }));
-        setProfileData(result.data);
-        setEditingProfile(false);
-        alert('Perfil actualizado correctamente');
-      } else {
-        alert(result.message || 'Error al actualizar el perfil');
-      }
-      
-    } catch (error) {
-      console.error('❌ Error al actualizar perfil:', error);
-      alert(error.message || 'Error al actualizar el perfil');
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setProfileData(user);
-    setEditingProfile(false);
-  };
-
-  const handleProfileInputChange = (field, value) => {
-    setProfileData(prev => ({
-      ...prev,
-      [field]: value
-    }));
   };
 
   // 🔥 HANDLER PARA CERRAR EL MODAL DE CAMBIO DE CONTRASEÑA
@@ -271,12 +272,6 @@ const ClienteDashboard = () => {
       ...prev,
       [categoryId]: !prev[categoryId]
     }));
-  };
-
-  const getUserInitials = (nombres, apellidos) => {
-    const firstInitial = nombres ? nombres.charAt(0).toUpperCase() : '';
-    const lastInitial = apellidos ? apellidos.charAt(0).toUpperCase() : '';
-    return firstInitial + lastInitial || 'C';
   };
 
   // ============================================================================
@@ -551,184 +546,52 @@ const ClienteDashboard = () => {
             </div>
           )}
 
-          {/* Profile Section */}
-          {activeSection === 'profile' && (
-            <div className="section-placeholder">
-              <div className="profile-section">
-                <div className="section-header">
-                  <div className="section-title">
-                    <User className="w-6 h-6 text-blue-600" />
-                    <h2>Mi Perfil</h2>
-                  </div>
-                  
-                  {!editingProfile ? (
-                    <button className="btn-primary" onClick={handleEditProfile}>
-                      <Edit className="w-4 h-4 mr-2" />
-                      Editar Perfil
-                    </button>
-                  ) : (
-                    <div className="profile-actions">
-                      <button className="btn-success" onClick={handleSaveProfile}>
-                        <Save className="w-4 h-4 mr-2" />
-                        Guardar
-                      </button>
-                      <button className="btn-secondary" onClick={handleCancelEdit}>
-                        <X className="w-4 h-4 mr-2" />
-                        Cancelar
-                      </button>
-                    </div>
-                  )}
+          {/* Secciones dinámicas del sistema */}
+          {activeSection !== 'overview' && (() => {
+            // Buscar el módulo activo según el ID
+            const activeModule = organizedModules
+              .flatMap(cat => cat.modules)
+              .find(mod => mod.id === activeSection);
+
+            if (!activeModule) {
+              // Si no existe, revisar si es una sección fija (perfil o notificaciones)
+              if (activeSection === 'profile') {
+                return <ProfileSection user={user} onUpdateProfile={handleUpdateProfile} />;
+              }
+              if (activeSection === 'notifications') {
+                return (
+                  <NotificationsSection 
+                    notifications={notifications}
+                    onMarkAsRead={handleMarkAsRead}
+                  />
+                );
+              }
+
+              // Si no está definida, mostrar mensaje genérico
+              return (
+                <div className="section-placeholder">
+                  <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                  <h2>Módulo en Desarrollo</h2>
+                  <p>Esta sección estará disponible próximamente.</p>
                 </div>
+              );
+            }
 
-                <div className="profile-content">
-                  <div className="profile-avatar-section">
-                    <div className="profile-avatar-container">
-                      {profileData.foto ? (
-                        <img src={profileData.foto} alt="Foto de perfil" className="profile-avatar-large" />
-                      ) : (
-                        <div className="profile-avatar-large-fallback">
-                          <span className="profile-initials-large">
-                            {getUserInitials(profileData.nombres, profileData.apellidos)}
-                          </span>
-                        </div>
-                      )}
-                      {editingProfile && (
-                        <button 
-                          className="avatar-edit-btn"
-                          onClick={() => alert('Funcionalidad de cambio de foto en desarrollo')}
-                        >
-                          <Camera className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+            // Si el módulo existe y tiene un componente definido
+            const Component = componentMap[activeModule.componentName];
+            if (Component) {
+              return <Component user={user} />;
+            }
 
-                  <div className="profile-form">
-                    <div className="form-grid">
-                      <div className="form-group">
-                        <label className="form-label">
-                          <User className="w-4 h-4" />
-                          Nombres
-                        </label>
-                        {editingProfile ? (
-                          <input
-                            type="text"
-                            className="form-input"
-                            value={profileData.nombres || ''}
-                            onChange={(e) => handleProfileInputChange('nombres', e.target.value)}
-                          />
-                        ) : (
-                          <div className="form-value">{profileData.nombres || 'No especificado'}</div>
-                        )}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          <User className="w-4 h-4" />
-                          Apellidos
-                        </label>
-                        {editingProfile ? (
-                          <input
-                            type="text"
-                            className="form-input"
-                            value={profileData.apellidos || ''}
-                            onChange={(e) => handleProfileInputChange('apellidos', e.target.value)}
-                          />
-                        ) : (
-                          <div className="form-value">{profileData.apellidos || 'No especificado'}</div>
-                        )}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          <Mail className="w-4 h-4" />
-                          Correo Electrónico
-                        </label>
-                        {editingProfile ? (
-                          <input
-                            type="email"
-                            className="form-input"
-                            value={profileData.email || ''}
-                            onChange={(e) => handleProfileInputChange('email', e.target.value)}
-                          />
-                        ) : (
-                          <div className="form-value">{profileData.email || 'No especificado'}</div>
-                        )}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          <Phone className="w-4 h-4" />
-                          Teléfono
-                        </label>
-                        {editingProfile ? (
-                          <input
-                            type="tel"
-                            className="form-input"
-                            value={profileData.telefono || ''}
-                            onChange={(e) => handleProfileInputChange('telefono', e.target.value)}
-                          />
-                        ) : (
-                          <div className="form-value">{profileData.telefono || 'No especificado'}</div>
-                        )}
-                      </div>
-
-                      <div className="form-group form-group-full">
-                        <label className="form-label">
-                          <MapPin className="w-4 h-4" />
-                          Dirección
-                        </label>
-                        {editingProfile ? (
-                          <textarea
-                            className="form-textarea"
-                            value={profileData.direccion || ''}
-                            onChange={(e) => handleProfileInputChange('direccion', e.target.value)}
-                            rows="3"
-                          />
-                        ) : (
-                          <div className="form-value">{profileData.direccion || 'No especificado'}</div>
-                        )}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          <Shield className="w-4 h-4" />
-                          Tipo de Cliente
-                        </label>
-                        <div className="form-value">
-                          <span className={`role-badge ${profileData.rol?.nombre_rol?.toLowerCase()}`}>
-                            {profileData.rol?.nombre_rol || 'Cliente'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          <Calendar className="w-4 h-4" />
-                          Cliente Desde
-                        </label>
-                        <div className="form-value">
-                          {profileData.fecha_registro ? 
-                            new Date(profileData.fecha_registro).toLocaleDateString('es-ES') : 
-                            'No disponible'
-                          }
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            // Si no hay componente vinculado
+            return (
+              <div className="section-placeholder">
+                <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                <h2>{activeModule.label}</h2>
+                <p>Componente no vinculado o en desarrollo.</p>
               </div>
-            </div>
-          )}
-
-          {/* Secciones genéricas para otros módulos */}
-          {!['overview', 'profile'].includes(activeSection) && (
-            <div className="section-placeholder">
-              <Activity className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <h2>Módulo en Desarrollo</h2>
-              <p>Esta sección estará disponible próximamente.</p>
-            </div>
-          )}
+            );
+          })()}
         </main>
       </div>
 

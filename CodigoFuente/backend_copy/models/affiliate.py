@@ -21,7 +21,7 @@ class UsuarioAfiliado(Base):
 
     # Relaciones ORM
     usuario_sistema = relationship("UsuarioSistema", backref="afiliaciones", lazy="joined")
-    sector = relationship("Sector", backref="afiliados", lazy="joined")  # 👈 relación con t_sector
+    sector = relationship("Sector", backref="afiliados", lazy="joined")  # relación con t_sector
 
     def __repr__(self):
         return f"<UsuarioAfiliado cod={self.cod_usuario_afi}, usuario_id={self.id_usuario_sistema}, sector_id={self.id_sector}>"

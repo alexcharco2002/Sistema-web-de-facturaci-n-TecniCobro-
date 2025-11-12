@@ -214,7 +214,7 @@ def crear_sector(
             id_usuario=current_user.id_usuario_sistema,
             titulo="Sector creado",
             mensaje=f"El sector '{nuevo_sector.nombre_sector}' fue creado correctamente.",
-            tipo="success"
+            tipo="exito"
         )
         
         return nuevo_sector

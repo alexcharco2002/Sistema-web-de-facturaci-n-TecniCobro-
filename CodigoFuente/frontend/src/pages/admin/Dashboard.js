@@ -19,6 +19,7 @@ import SectorsSection from '../../components/SectorsSection';
 import ChangePasswordModal from '../../components/ChangePasswordModal';
 import NotificationsSection  from '../../components/NotificationsSection';
 import AffiliatesSection from '../../components/AffiliatesSection';
+import MetersSection from '../../components/MetersSection';
 
 // Estilos
 import './style.css';
@@ -37,7 +38,8 @@ const componentMap = {
   ProfileSection,
   SectorsSection,
   NotificationsSection,
-  AffiliatesSection
+  AffiliatesSection,
+  MetersSection
 };
 
 const AdminDashboard = () => {

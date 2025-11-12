@@ -377,7 +377,7 @@ def create_user(
             id_usuario=current_user.id_usuario_sistema,
             titulo="Usuario creado",
             mensaje=f"El usuario '{new_user.usuario}' fue creado correctamente.",
-            tipo="success"
+            tipo="exito"
         )
         print(f"✅ Usuario creado exitosamente: {username}")
 

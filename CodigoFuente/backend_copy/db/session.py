@@ -1,3 +1,5 @@
+# db/session.py 
+# Configuración de la base de datos y sesión de SQLAlchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 

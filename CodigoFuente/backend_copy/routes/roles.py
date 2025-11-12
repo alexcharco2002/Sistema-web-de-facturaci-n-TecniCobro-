@@ -189,7 +189,7 @@ def crear_rol(
             id_usuario=current_user.id_usuario_sistema,
             titulo="Rol creado",
             mensaje=f"El rol '{nuevo_rol.nombre_rol}' fue creado correctamente.",
-            tipo="success"
+            tipo="exito"
         )
         
         return nuevo_rol

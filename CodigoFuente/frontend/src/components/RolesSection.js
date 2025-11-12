@@ -78,6 +78,7 @@ const RolesSection = () => {
     { value: 'Usuarios', label: 'Usuarios' },
     { value: 'Roles', label: 'Roles' },
     { value: 'Afiliados', label: 'Afiliados' },
+    { value: 'Medidores', label: 'Medidores' },
     { value: 'Sectores', label: 'Sectores' },
     { value: 'Lecturas', label: 'Lecturas' },
     { value: 'Facturas', label: 'Facturas' },

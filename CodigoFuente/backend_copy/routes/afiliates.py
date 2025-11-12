@@ -349,7 +349,7 @@ def crear_afiliado(
             id_usuario=current_user.id_usuario_sistema,
             titulo="Afiliado creado",
             mensaje=f"El usuario '{user.nombres} {user.apellidos}' fue afiliado correctamente con código {nuevo_codigo}.",
-            tipo="success"
+            tipo="exito"
         )
         
         return affiliate_to_response(nuevo_afiliado, db)

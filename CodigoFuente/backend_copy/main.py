@@ -8,6 +8,7 @@ from routes import roles
 from routes import sectors
 from routes import notifications
 from routes import afiliates
+from routes import meters
 import os
 
 app = FastAPI(
@@ -44,6 +45,7 @@ app.include_router(roles.router)
 app.include_router(sectors.router)
 app.include_router(notifications.router)
 app.include_router(afiliates.router)
+app.include_router(meters.router)
 
 
 # Health check general
